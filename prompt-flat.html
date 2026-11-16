@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flat Prompt Maker</title>
+<style>
+  :root {
+    --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1c1a; --muted: #6b6760; --line: #dcd8d0;
+    --accent: #2f6f5e; --accent-ink: #ffffff; --warn: #a3471c; --ok: #2f6f5e; --code: #f8f7f4;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161614; --panel: #201f1d; --ink: #ecebe7; --muted: #a29e96; --line: #3a3834;
+      --accent: #5fb39b; --accent-ink: #10201b; --warn: #e3875c; --ok: #5fb39b; --code: #1a1a18;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 40px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+  label { display: block; font-weight: 600; font-size: 13px; margin: 14px 0 5px; }
+  label:first-child { margin-top: 0; }
+  label .opt { font-weight: 400; color: var(--muted); }
+  input, textarea { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 7px; padding: 8px 10px; }
+  input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  textarea { resize: vertical; min-height: 60px; }
+  .size { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .hint { font-size: 12.5px; color: var(--muted); margin-top: 4px; min-height: 1em; }
+  .hint.warn { color: var(--warn); }
+  .hint.ok { color: var(--ok); }
+  .preview { margin-top: 10px; border: 1px dashed var(--line); border-radius: 8px; min-height: 120px; display: grid;
+    place-items: center; overflow: hidden; background: var(--code); color: var(--muted); font-size: 13px; text-align: center; padding: 6px; }
+  .preview img { max-width: 100%; max-height: 260px; display: block; border-radius: 4px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .bar h2 { font-size: 15px; margin: 0 auto 0 0; }
+  button { font: inherit; font-weight: 600; border-radius: 7px; padding: 7px 14px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12.5px/1.55 ui-monospace, Consolas, monospace;
+    background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 14px; max-height: 72vh; overflow: auto; }
+  .status { font-size: 13px; color: var(--muted); }
+  .rooms { display: grid; gap: 6px; }
+  .room { display: grid; grid-template-columns: minmax(0, 1fr) 90px 34px; gap: 6px; }
+  .room button { padding: 0; }
+  .row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  select { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; }
+  .check { display: flex; gap: 8px; align-items: center; font-weight: 400; }
+  .check input { width: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Flat prompt maker</h1>
+  <p class="sub">Fill in the plan picture and the room areas. The prompt for building a new walkable flat is written as you type.</p>
+
+  <div class="grid">
+    <section class="card" aria-label="Flat">
+      <label for="url">Plan image URL or file path</label>
+      <input id="url" type="text" placeholder="https://… .webp, or C:\…\plan.jpeg" autocomplete="off">
+      <div class="preview" id="preview">No picture yet</div>
+
+      <label for="name">Descriptive name <span class="opt">(optional: Claude picks one if empty)</span></label>
+      <input id="name" type="text" placeholder="twobed-balcony-95m2" autocomplete="off" spellcheck="false">
+
+      <label for="total">Total area, m² <span class="opt">(საერთო ფართი)</span></label>
+      <input id="total" type="number" min="0" step="0.01" placeholder="95.6">
+      <div class="hint" id="sumHint"></div>
+
+      <label>Rooms <span class="opt">(Georgian name and m²; leave empty to read them from the plan)</span></label>
+      <div class="rooms" id="rooms"></div>
+      <div class="bar" style="margin:8px 0 0">
+        <button type="button" id="addRoom">+ Room</button>
+        <button type="button" id="pasteBtn">Paste list…</button>
+      </div>
+      <textarea id="paste" hidden placeholder="ჰოლი	11.3 მ2&#10;საერთო ოთახი	30 მ2&#10;საძინებელი	22.1"></textarea>
+
+      <div class="row2">
+        <div>
+          <label for="turn">Main windows</label>
+          <select id="turn">
+            <option value="">find them</option>
+            <option value="top">top of the image</option>
+            <option value="bottom">bottom of the image</option>
+            <option value="left">left of the image</option>
+            <option value="right">right of the image</option>
+          </select>
+        </div>
+        <div>
+          <label for="furn">Furniture</label>
+          <select id="furn">
+            <option value="plan">as drawn on the plan</option>
+            <option value="none">none (empty flat)</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="check"><input type="checkbox" id="publish" checked> Publish as a private artifact</label>
+
+      <label for="notes">Notes <span class="opt">(optional)</span></label>
+      <textarea id="notes" placeholder="All doors 0.8 m wide. The small room is a storage room."></textarea>
+    </section>
+
+    <section class="card" aria-label="Prompt">
+      <div class="bar">
+        <h2>Prompt</h2>
+        <span class="status" id="status"></span>
+        <button id="dl" type="button">Download .txt</button>
+        <button id="copy" type="button" class="primary">Copy prompt</button>
+      </div>
+      <pre id="out"></pre>
+    </section>
+  </div>
+</main>
+
+<!-- The prompt. {{tokens}} are filled from the form; keep it in step with prompt.txt. -->
+<script type="text/plain" id="tpl"># Build Apartment Model
+
+Build an apartment model using the flat template in `"{{root}}"`.
+
+- Plan image: {{url}}
+- Name: {{name}}
+
+## Room areas
+
+{{rooms}}
+## Instructions
+
+1. Read `"{{root}}\CLAUDE.md"` first and follow its Per-flat procedure.
+2. Write the apartment's JSON file only. If a furniture piece is missing, add it as a file in `furniture\` and run `tools\furniture-index.mjs`; touch `src\` only if an opening kind is missing.
+3. Start with `tools\trace.mjs`.
+4. If the walls are dark or the background is transparent and the tracer gives fragments, measure the walls from pixel scans as for previous apartments (see State).
+5. {{turnStep}}
+6. If the plan has diagonal or curved walls, tell me before building.
+7. Use the same style as the other apartments.
+8. Use Georgian room names with their specified areas.
+9. Leave people out; the entrance door stays shut.
+10. {{furnStep}}
+11. If my areas and the picture disagree, trust the areas and tell me what you moved.
+12. For the flat create a folder in `results\` with the plan image, an `info.txt` with the plan image URL, the measurements and the price it would cost to create it with the Claude API, and the scripts.
+{{notes}}
+## Completion criteria
+
+- `build.mjs` shows every room within 1% of its specified area.
+- The top-view overlay lines up with the original image.
+- `walktest.mjs` reports `RESULT: PASS` on desktop and touch.
+- The offline file is saved in `"{{root}}\results\<folder>\"` using a descriptive, unique filename, with the `.html` in that same folder.
+{{publishLine}}- Add the apartment to the State section of `CLAUDE.md`, using its descriptive name rather than a flat number.
+
+## Cost constraints
+
+- Use approximately four screenshots.
+- Use text checks otherwise.
+- Do not ask questions unless blocked.
+
+## Final response
+
+Provide:
+1. Link to the offline HTML file.
+2. {{publishAnswer}}
+3. What you assumed.
+4. What you did not check.
+5. Confirmation that the apartment was added to the State section of `CLAUDE.md`.
+</script>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const TPL = $('tpl').textContent;
+const FALLBACK_ROOT = 'C:\\Users\\Jeko\\Desktop\\flat-3d - Copy';
+function projectRoot() {
+  if (location.protocol !== 'file:') return FALLBACK_ROOT;
+  const p = decodeURIComponent(location.pathname).replace(/^\/([A-Za-z]:)/, '$1').replace(/\//g, '\\');
+  return p.slice(0, p.lastIndexOf('\\')) || FALLBACK_ROOT;
+}
+const ROOT = projectRoot();
+const DRAFT = 'flatPrompt:draft';
+
+function addRoom(name = '', area = '') {
+  const row = document.createElement('div');
+  row.className = 'room';
+  row.innerHTML = '<input type="text" placeholder="საძინებელი" autocomplete="off"><input type="number" min="0" step="0.01" placeholder="m²">'
+    + '<button type="button" title="Remove room" aria-label="Remove room">×</button>';
+  const [n, a, x] = row.children;
+  n.value = name; a.value = area;
+  n.addEventListener('input', render); a.addEventListener('input', render);
+  x.addEventListener('click', () => { row.remove(); if (!$('rooms').children.length) addRoom(); render(); });
+  $('rooms').appendChild(row);
+  return n;
+}
+const rooms = () => [...$('rooms').children].map((r) => ({ name: r.children[0].value.trim(), area: r.children[1].value.trim() }))
+  .filter((r) => r.name || r.area);
+
+// "ჰოლი	11.3 მ2" or "ჰოლი 11,3" per line; a line with საერთო ფართი fills the total
+function parsePaste(text) {
+  const got = [];
+  text.split(/\r?\n/).forEach((line) => {
+    const m = /^(.*?)[\s:–-]*([0-9]+(?:[.,][0-9]+)?)\s*(?:მ2|მ²|m2|m²|კვ\.?\s*მ)?\s*$/.exec(line.trim());
+    if (!m || !m[1].trim()) return;
+    const area = m[2].replace(',', '.');
+    if (/საერთო\s*ფართ/.test(m[1])) $('total').value = area; else got.push([m[1].trim(), area]);
+  });
+  return got;
+}
+
+function render() {
+  const url = $('url').value.trim(), name = $('name').value.trim(), total = $('total').value.trim();
+  const list = rooms(), turn = $('turn').value, furn = $('furn').value, pub = $('publish').checked, notes = $('notes').value.trim();
+  const sum = list.reduce((s, r) => s + (parseFloat(r.area) || 0), 0);
+  const hint = $('sumHint');
+  hint.className = 'hint';
+  if (total && list.length) {
+    const diff = sum - parseFloat(total);
+    hint.textContent = 'Rooms add up to ' + sum.toFixed(2) + ' m²' + (Math.abs(diff) > 0.05 ? ' (' + (diff > 0 ? '+' : '') + diff.toFixed(2) + ' against the total)' : ', same as the total');
+    if (Math.abs(diff) > 0.05) hint.className = 'hint warn'; else hint.className = 'hint ok';
+  } else hint.textContent = list.length ? 'Rooms add up to ' + sum.toFixed(2) + ' m²' : '';
+
+  let roomText = '';
+  if (total) roomText += 'საერთო ფართი ' + total + ' მ2\n\n';
+  if (list.length) roomText += list.map((r) => r.name + '\t' + (r.area ? r.area + ' მ2' : '?')).join('\n') + '\n';
+  else roomText += 'Not given: read the room names and areas from the plan\'s own labels and say so.\n';
+
+  const side = { top: 'top', bottom: 'bottom', left: 'left', right: 'right' }[turn];
+  const tokens = {
+    root: ROOT,
+    url: url || '<plan image>',
+    name: name || 'pick a short descriptive name (rooms, balcony, area), unique in results\\',
+    rooms: roomText,
+    turnStep: side ? 'The main windows are at the ' + side + ' of the image: turn the plan so they face south.' : 'Turn the plan so its main windows face south.',
+    furnStep: furn === 'none'
+      ? 'Build it unfurnished: walls, doors, windows and ceiling lights only. I add furniture myself in the Furniture panel.'
+      : 'Place furniture where the image shows it, using the pieces in `FORMAT.md`. Keep walkways clear.',
+    notes: notes ? '\n## Notes\n\n' + notes + '\n' : '',
+    publishLine: pub ? '- Publish the page as a new private artifact, with the furniture folder.\n' : '- Do not publish anything.\n',
+    publishAnswer: pub ? 'Link to the published private artifact.' : 'Confirmation that nothing was published.',
+  };
+  const text = TPL.replace(/\{\{(\w+)\}\}/g, (m, k) => (k in tokens ? tokens[k] : m)).replace(/\n+$/, '\n');
+  $('out').textContent = text;
+
+  const missing = [];
+  if (!url) missing.push('a plan image');
+  if (!total && !list.length) missing.push('the areas (or a total)');
+  $('copy').disabled = $('dl').disabled = missing.length > 0;
+  $('status').textContent = missing.length ? 'Needs ' + missing.join(' and ') : '';
+  try { localStorage.setItem(DRAFT, JSON.stringify({ url, name, total, list, turn, furn, pub, notes })); } catch (e) { /* no storage */ }
+  return text;
+}
+
+let lastUrl = null;
+function updatePreview() {
+  const url = $('url').value.trim();
+  if (url === lastUrl) return;
+  lastUrl = url;
+  const box = $('preview');
+  const src = /^[A-Za-z]:\\/.test(url) ? 'file:///' + url.replace(/\\/g, '/') : (/^(https?|file):\/\//i.test(url) ? url : '');
+  box.textContent = url ? (src ? 'Loading…' : 'Not a web address or a file path') : 'No picture yet';
+  if (!src) return;
+  const img = new Image();
+  img.alt = 'Plan';
+  img.onload = () => { if (lastUrl === url) { box.textContent = ''; box.appendChild(img); } };
+  img.onerror = () => { if (lastUrl === url) box.textContent = 'The picture did not load here. Claude may still be able to download it; check the address.'; };
+  img.src = src;
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* fall back */ }
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  const ok = document.execCommand('copy'); ta.remove(); return ok;
+}
+
+['url', 'name', 'total', 'notes'].forEach((k) => $(k).addEventListener('input', () => { if (k === 'url') updatePreview(); render(); }));
+['turn', 'furn', 'publish'].forEach((k) => $(k).addEventListener('change', render));
+$('addRoom').addEventListener('click', () => { addRoom().focus(); render(); });
+$('pasteBtn').addEventListener('click', () => {
+  const ta = $('paste');
+  if (ta.hidden) { ta.hidden = false; ta.focus(); $('pasteBtn').textContent = 'Add pasted rooms'; return; }
+  const got = parsePaste(ta.value);
+  if (got.length) {
+    [...$('rooms').children].forEach((r) => { if (!r.children[0].value.trim() && !r.children[1].value.trim()) r.remove(); });
+    got.forEach(([n, a]) => addRoom(n, a));
+  }
+  ta.value = ''; ta.hidden = true; $('pasteBtn').textContent = 'Paste list…';
+  render();
+});
+$('copy').addEventListener('click', async () => { $('status').textContent = (await copyText(render())) ? 'Copied' : 'Could not copy: select the text and press Ctrl+C'; });
+$('dl').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([render()], { type: 'text/plain;charset=utf-8' }));
+  a.download = 'prompt-flat-' + ($('name').value.trim() || 'new') + '.txt';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+// restore the last draft
+let d = null;
+try { d = JSON.parse(localStorage.getItem(DRAFT) || 'null'); } catch (e) { /* none */ }
+if (d) {
+  $('url').value = d.url || ''; $('name').value = d.name || ''; $('total').value = d.total || '';
+  $('turn').value = d.turn || ''; $('furn').value = d.furn || 'plan'; $('publish').checked = d.pub !== false; $('notes').value = d.notes || '';
+  (d.list || []).forEach((r) => addRoom(r.name, r.area));
+}
+if (!$('rooms').children.length) addRoom();
+updatePreview();
+render();
+</script>
+</body>
+</html>

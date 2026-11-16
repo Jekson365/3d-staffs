@@ -176,7 +176,7 @@ body { background: var(--stage); color: var(--ink); font-family: var(--f-ui); fo
   <div class="hud">
     <div class="tags" id="tags"></div>
     <div class="title card">
-      <div><div class="t-ka">შოურუმი</div><div class="t-en">Showroom: chest</div></div>
+      <div><div class="t-ka">შოურუმი</div><div class="t-en">Showroom: dining set</div></div>
       <div><div class="t-area num">18.0 მ²</div><div class="k">1 room</div></div>
     </div>
     <div class="tools">
@@ -257,7 +257,7 @@ body { background: var(--stage); color: var(--ink); font-family: var(--f-ui); fo
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.159.0/three.min.js"></script>
 <script>
 'use strict';
-const FLAT = {"name":"showroom","file":"showroom","title":{"ka":"შოურუმი","en":"Showroom: chest","rooms":"1 room"},"start":[2.45,3.55,0],"rooms":[{"id":"living","ka":"საერთო ოთახი","en":"Living room","area":18,"rects":[[0.2,0.2,4.7,4.2]],"label":[2.45,3.6],"floor":{"mat":"floorLiv","uv":"plank","off":[0.31,0.2]}}],"walls":[[0,0,4.9,0.2],[0,4.2,4.9,4.4],[0,0.2,0.2,4.2],[4.7,0.2,4.9,4.2]],"shafts":[],"openings":[{"id":"entry","kind":"entry","axis":"z","at":[4.7,4.9],"a":2.9,"b":3.85,"handle":"a"},{"id":"winLiv","kind":"window","axis":"x","at":[4.2,4.4],"a":1.45,"b":3.45}],"rails":[],"switches":[[4.7,2.7,-90]],"furniture":[{"t":"kajada","x":2.45,"z":0.45},{"t":"rug","mat":"rugTri","rect":[1.25,1.2,3.65,2.9]},{"t":"coffeeTable","x":3.1,"z":1.8},{"t":"floorLamp","x":0.55,"z":0.55},{"t":"plantLeafy","x":4.3,"z":0.6,"seed":3,"h":1.4,"n":16,"leaf":0.3,"mats":["leafA","leafA","leafD"],"pot":"pot","potR":0.17,"potH":0.34},{"t":"downlight","x":1.3,"z":1.2},{"t":"downlight","x":3.6,"z":1.2},{"t":"downlight","x":1.3,"z":3.2},{"t":"downlight","x":3.6,"z":3.2},{"t":"ceilingLamp","x":2.45,"z":2.2,"s":0.22,"I":1.6,"col":"SOFT","ch":2}],"bounds":[0,0,4.9,4.4],"map":{"x0":-0.2,"z0":-0.2,"w":5.3,"d":4.8},"digits":1,"total":18};
+const FLAT = {"name":"showroom","file":"showroom","title":{"ka":"შოურუმი","en":"Showroom: dining set","rooms":"1 room"},"start":[2.45,3.55,0],"rooms":[{"id":"living","ka":"საერთო ოთახი","en":"Living room","area":18,"rects":[[0.2,0.2,4.7,4.2]],"label":[2.45,3.6],"floor":{"mat":"floorLiv","uv":"plank","off":[0.31,0.2]}}],"walls":[[0,0,4.9,0.2],[0,4.2,4.9,4.4],[0,0.2,0.2,4.2],[4.7,0.2,4.9,4.2]],"shafts":[],"openings":[{"id":"entry","kind":"entry","axis":"z","at":[4.7,4.9],"a":2.9,"b":3.85,"handle":"a"},{"id":"winLiv","kind":"window","axis":"x","at":[4.2,4.4],"a":1.45,"b":3.45}],"rails":[],"switches":[[4.7,2.7,-90]],"furniture":[{"t":"hagernas","x":2.45,"z":2.05},{"t":"rug","mat":"rugTri","rect":[1.25,1.2,3.65,2.9]},{"t":"coffeeTable","x":4,"z":3.4},{"t":"floorLamp","x":0.55,"z":0.55},{"t":"plantLeafy","x":4.3,"z":0.6,"seed":3,"h":1.4,"n":16,"leaf":0.3,"mats":["leafA","leafA","leafD"],"pot":"pot","potR":0.17,"potH":0.34},{"t":"downlight","x":1.3,"z":1.2},{"t":"downlight","x":3.6,"z":1.2},{"t":"downlight","x":1.3,"z":3.2},{"t":"downlight","x":3.6,"z":3.2},{"t":"ceilingLamp","x":2.45,"z":2.2,"s":0.22,"I":1.6,"col":"SOFT","ch":2}],"bounds":[0,0,4.9,4.4],"map":{"x0":-0.2,"z0":-0.2,"w":5.3,"d":4.8},"digits":1,"total":18};
 // ---------- 10-util.js : maths, geometry batching, primitive builders ----------
 const T = THREE;
 const PI = Math.PI, TAU = PI * 2, DEG = PI / 180;

@@ -1,5 +1,5 @@
 'use strict';
-const FLAT = {"name":"showroom","file":"showroom","title":{"ka":"შოურუმი","en":"Showroom: chest","rooms":"1 room"},"start":[2.45,3.55,0],"rooms":[{"id":"living","ka":"საერთო ოთახი","en":"Living room","area":18,"rects":[[0.2,0.2,4.7,4.2]],"label":[2.45,3.6],"floor":{"mat":"floorLiv","uv":"plank","off":[0.31,0.2]}}],"walls":[[0,0,4.9,0.2],[0,4.2,4.9,4.4],[0,0.2,0.2,4.2],[4.7,0.2,4.9,4.2]],"shafts":[],"openings":[{"id":"entry","kind":"entry","axis":"z","at":[4.7,4.9],"a":2.9,"b":3.85,"handle":"a"},{"id":"winLiv","kind":"window","axis":"x","at":[4.2,4.4],"a":1.45,"b":3.45}],"rails":[],"switches":[[4.7,2.7,-90]],"furniture":[{"t":"kajada","x":2.45,"z":0.45},{"t":"rug","mat":"rugTri","rect":[1.25,1.2,3.65,2.9]},{"t":"coffeeTable","x":3.1,"z":1.8},{"t":"floorLamp","x":0.55,"z":0.55},{"t":"plantLeafy","x":4.3,"z":0.6,"seed":3,"h":1.4,"n":16,"leaf":0.3,"mats":["leafA","leafA","leafD"],"pot":"pot","potR":0.17,"potH":0.34},{"t":"downlight","x":1.3,"z":1.2},{"t":"downlight","x":3.6,"z":1.2},{"t":"downlight","x":1.3,"z":3.2},{"t":"downlight","x":3.6,"z":3.2},{"t":"ceilingLamp","x":2.45,"z":2.2,"s":0.22,"I":1.6,"col":"SOFT","ch":2}],"bounds":[0,0,4.9,4.4],"map":{"x0":-0.2,"z0":-0.2,"w":5.3,"d":4.8},"digits":1,"total":18};
+const FLAT = {"name":"showroom","file":"showroom","title":{"ka":"შოურუმი","en":"Showroom: dining set","rooms":"1 room"},"start":[2.45,3.55,0],"rooms":[{"id":"living","ka":"საერთო ოთახი","en":"Living room","area":18,"rects":[[0.2,0.2,4.7,4.2]],"label":[2.45,3.6],"floor":{"mat":"floorLiv","uv":"plank","off":[0.31,0.2]}}],"walls":[[0,0,4.9,0.2],[0,4.2,4.9,4.4],[0,0.2,0.2,4.2],[4.7,0.2,4.9,4.2]],"shafts":[],"openings":[{"id":"entry","kind":"entry","axis":"z","at":[4.7,4.9],"a":2.9,"b":3.85,"handle":"a"},{"id":"winLiv","kind":"window","axis":"x","at":[4.2,4.4],"a":1.45,"b":3.45}],"rails":[],"switches":[[4.7,2.7,-90]],"furniture":[{"t":"hagernas","x":2.45,"z":2.05},{"t":"rug","mat":"rugTri","rect":[1.25,1.2,3.65,2.9]},{"t":"coffeeTable","x":4,"z":3.4},{"t":"floorLamp","x":0.55,"z":0.55},{"t":"plantLeafy","x":4.3,"z":0.6,"seed":3,"h":1.4,"n":16,"leaf":0.3,"mats":["leafA","leafA","leafD"],"pot":"pot","potR":0.17,"potH":0.34},{"t":"downlight","x":1.3,"z":1.2},{"t":"downlight","x":3.6,"z":1.2},{"t":"downlight","x":1.3,"z":3.2},{"t":"downlight","x":3.6,"z":3.2},{"t":"ceilingLamp","x":2.45,"z":2.2,"s":0.22,"I":1.6,"col":"SOFT","ch":2}],"bounds":[0,0,4.9,4.4],"map":{"x0":-0.2,"z0":-0.2,"w":5.3,"d":4.8},"digits":1,"total":18};
 // ---------- 10-util.js : maths, geometry batching, primitive builders ----------
 const T = THREE;
 const PI = Math.PI, TAU = PI * 2, DEG = PI / 180;
@@ -2256,6 +2256,40 @@ piece('fruitBowl', { name: 'Fruit bowl' }, function (p) {
   place(p.x, p.y || 0.9, p.z, 0, () => {
     LA('ochre', 0, 0, 0, [[0.001, 0], [0.07, 0], [0.15, 0.07], [0.142, 0.07], [0.066, 0.01], [0.001, 0.01]], { seg: 20 });
     for (const [x, z, m] of [[0.04, 0.02, 'yellow'], [-0.05, 0.03, 'yellow'], [0, -0.055, 'yellow'], [0.01, 0.01, 'leafC'], [-0.03, -0.02, 'yellow']]) SP(m, x, 0.045 + (m === 'leafC' ? 0.045 : 0), z, 0.034, { sy: 0.9 });
+  });
+});
+
+// HAGERNAS solid pine dining set (gorgia.ge BM-00217948): table 1.20 x 0.75, 0.74 high, with four chairs
+// (0.40 wide, 0.45 deep, seat 0.45, back 0.83), two on each long side. Whole set about 1.20 x 1.55.
+// native: long side along X, chairs north and south facing the table. Values: `mat` the wood (default oak), `chairs` 0 table only.
+piece('hagernas', { name: 'HAGERNAS', add: 36 }, function (p) {
+  const M = p.mat || 'oak', W = 1.2, D = 0.75, TH = 0.74, hw = W / 2, hd = D / 2;
+  const chair = (x, z, ry) => place(x, 0, z, ry, () => {   // the sitter faces +Z
+    const L = 0.035, sx = 0.18, sz = 0.18;
+    for (const lx of [-sx, sx]) {
+      B(M, lx, 0, sz, L, 0.43, L, { occ: false });                                  // front legs
+      B(M, lx, 0, -sz, L, 0.83, L, { rx: -0.05, occ: false });                       // back legs run up into the back
+      B(M, lx, 0.12, 0, 0.025, 0.035, 2 * sz, { occ: false });                       // side stretchers
+    }
+    B(M, 0, 0.12, sz, 2 * sx, 0.03, 0.025, { occ: false });
+    RB(M, 0, 0.43, 0.005, 0.41, 0.025, 0.42, 0.006, { occ: false });               // seat
+    B(M, 0, 0.395, 0, 2 * sx, 0.04, 2 * sz, { occ: false });                       // seat rails
+    B(M, 0, 0.72, -sz - 0.035, 2 * sx + 0.03, 0.09, 0.022, { rx: -0.05, occ: false }); // top rail
+    B(M, 0, 0.56, -sz - 0.025, 2 * sx, 0.05, 0.02, { rx: -0.05, occ: false });     // middle rail
+    colRect(-0.2, -0.22, 0.2, 0.22);
+  });
+  pAt(p, () => {
+    RB(M, 0, TH - 0.035, 0, W, 0.035, D, 0.006, { cell: 0.2 });
+    for (const x of [-hw + 0.04, hw - 0.04]) for (const z of [-hd + 0.04, hd - 0.04]) B(M, x, 0, z, 0.06, TH - 0.035, 0.06);
+    BX(M, -hw + 0.04, TH - 0.12, -hd + 0.03, hw - 0.04, TH - 0.035, -hd + 0.05, { occ: false });
+    BX(M, -hw + 0.04, TH - 0.12, hd - 0.05, hw - 0.04, TH - 0.035, hd - 0.03, { occ: false });
+    BX(M, -hw + 0.03, TH - 0.12, -hd + 0.04, -hw + 0.05, TH - 0.035, hd - 0.04, { occ: false });
+    BX(M, hw - 0.05, TH - 0.12, -hd + 0.04, hw - 0.03, TH - 0.035, hd - 0.04, { occ: false });
+    colRect(-hw, -hd, hw, hd);
+    if (p.chairs !== 0) {
+      chair(-0.28, -hd - 0.08, 0); chair(0.28, -hd - 0.08, 0);
+      chair(-0.28, hd + 0.08, PI); chair(0.28, hd + 0.08, PI);
+    }
   });
 });
 

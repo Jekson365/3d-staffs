@@ -120,6 +120,7 @@ The comment at the top of each piece file in the shared folder `furniture/` (one
 | `channelCornerSofa` (2.55 x 0.92, 1.60 deep at the chaise, 0.86 high; gorgia.ge BM-00157269) | sitter faces south, chaise west | `mat` (default `teal`), `chaise` 1 west / -1 east, `pillows` 0 no throw pillows |
 | `pcChair` (0.66 base, 0.62 wide at the arms, 1.20 high, seat 0.48; gorgia.ge BM-00195991) | sitter faces south | `mat` upholstery (default `beige`), `frame` base and arms (default `beige`) |
 | `kajada` (კაჟადა: painted chest 0.90 x 0.45, 0.95 high; gorgia.ge BM-00170661) | front faces south | `mat` paint (default `cabinet`), `metal` handles (default `brass`) |
+| `hagernas` (pine dining set: table 1.20 x 0.75, 0.74 high, four chairs 0.40 x 0.45, back 0.83; whole set about 1.20 x 1.55; gorgia.ge BM-00217948) | long side along X, chairs north and south | `mat` wood (default `oak`), `chairs` 0 table only |
 | `art` | framed print on a wall, facing south | `mat` (`art1`..`art3`), `y` centre height, `w`, `h` |
 | `curtain`, `curtainTrack` | along X only | `x0`, `x1`, `z`, `y0`, `y1` |
 | `bed` | double, head to the west | |

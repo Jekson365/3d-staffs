@@ -30,6 +30,7 @@
   'floorLamp',
   'fridge',
   'fruitBowl',
+  'hagernas',
   'jars',
   'kajada',
   'kitchenShelf',
