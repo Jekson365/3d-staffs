@@ -1,0 +1,49 @@
+Two-bedroom flat with one balcony, 95.6 m2  (data name twobed95)
+Built 2026-11-14 with the flat-3d template in "flat-3d - Copy".
+
+PLAN IMAGE
+  https://x2.ge/assets/2d_render_images/667e7ffdb2aee.webp
+  (791 x 600 WebP with transparency; saved here as plan.webp)
+  Turned 180 degrees so the bedroom windows and the balcony face south.
+
+PAGES
+  Offline:   C:\Users\Jeko\Desktop\flat-3d - Copy\results\twobed-one-balcony-95m2.html
+  Published: https://claude.ai/artifact/HLVtyrUXUZ69Vs6hujSLJa  (private)
+
+ROOM AREAS (given -> built from the walls)
+  საერთო ფართი (total)     95.6  (the six given areas add up to 95.9)
+  ჰოლი                     11.3  -> 11.33  (+0.3 %)
+  საერთო ოთახი             30.0  -> 30.05  (+0.2 %)  living room with kitchen
+  საძინებელი (bedroom 1)   22.1  -> 22.09  (-0.0 %)  east bedroom, door to the balcony
+  საძინებელი (bedroom 2)   21.7  -> 21.70  (-0.0 %)  west bedroom
+  სანკვანძი                 5.6  -> 5.65   (+0.8 %)
+  აივანი                    5.2  -> 5.22   (+0.4 %)
+
+MEASUREMENTS (metres; scale 55.8 px per metre; outer north-west corner at px (92, 9) of the turned image)
+  Whole plan, outside faces incl. balcony     10.75 x 10.29
+  Ceiling height                              2.70
+  Living room with kitchen                    3.59 wide x 8.40 long
+  Bedroom 1                                   3.12 x 7.17 (incl. its wardrobe recess)
+  Bedroom 2                                   3.12 x 6.43, plus a 1.18 x 1.51 entry nook
+  Bathroom                                    1.69 x 3.33
+  Hall                                        4.77 x 2.60 (L-shaped, open to the living room)
+  Balcony                                     3.46 x 1.33 plus a 2.94 x 0.22 strip at the rail
+  Outer walls 0.20 (east wall 0.32), partitions 0.10-0.12, column between the bedrooms 0.32-0.61
+  Doors 0.82-1.04; entrance 1.08 in the north wall
+
+MOVED FOR THE AREAS
+  - Bedroom 2's door wall moved 0.37 m north (drawn at plan y 142, built at 121.5) so the bedroom reaches 21.7.
+  - East outer wall's inner face moved 0.12 m in so the living room is 30.0, not 31.0.
+  - Balcony's north wall thinned to 0.14 m (drawn 0.23) and the rail set on the outer face line.
+
+FILES
+  gen.py   writes source\flats\twobed95.json (run from source: py -I "../results/twobed-one-balcony-95m2/gen.py" 55.8 121.5 6.9 497)
+  scan.py  dark-pixel runs along rows/columns of the plan image
+
+ESTIMATED COST WITH THE CLAUDE API (Claude Opus 5.5: $4 / M input, $20 / M output,
+  $0.20 / M cache reads, cache writes about $8 / M with the 1-hour cache)
+  About 25 model turns, context growing from ~25K to ~85K tokens.
+    cache reads   ~1.1 M tokens   ~$0.22
+    cache writes  ~0.10 M tokens  ~$0.80
+    output        ~0.02 M tokens  ~$0.40   (incl. thinking)
+  Total about $1.5 (likely range $1-2.5). An estimate from the session's shape, not a billed figure.

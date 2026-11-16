@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Plan check</title>
+<!-- Lays a flat's top view (dist/shots/top-0.png, taken at 1400 x 900 with __flat.top()) over its reference render at the
+     same scale. Open as compare.html#<name>/mix, #<name>/ref or #<name>/mine. Reads dist/<name>/flat.js (written by build.mjs)
+     for the key-plan area and the render's scale and corner ("ref" in the data file). -->
+<style>html, body { margin: 0; background: #777; overflow: hidden; } canvas { display: block; }</style>
+<canvas id="c" width="1400" height="900"></canvas>
+<script>
+const [name, mode = 'mix'] = (location.hash.slice(1) || 'flat1/mix').split('/');
+const s = document.createElement('script');
+s.src = '../dist/' + name + '/flat.js';
+s.onload = () => draw(window.FLATDATA);
+document.head.appendChild(s);
+const load = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('cannot load ' + src)); i.src = src; });
+function draw(F) {
+  const g = document.getElementById('c').getContext('2d'), M = F.map, W = 1400, Hh = 900;
+  // how __flat.top() fits the key-plan area into the picture
+  const half = Math.max(M.d, M.w * Hh / W) / 2, ppm = Hh / (2 * half);
+  const ox = W / 2 - (M.x0 + M.w / 2) * ppm, oz = Hh / 2 - (M.z0 + M.d / 2) * ppm;   // screen position of the origin
+  Promise.all([load('../ref/' + F.ref.image), load('../dist/shots/top-0.png')]).then(([ref, mine]) => {
+    const k = ppm / F.ref.ppm;
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, Hh);
+    if (mode !== 'mine') g.drawImage(ref, ox - F.ref.origin[0] * k, oz - F.ref.origin[1] * k, ref.naturalWidth * k, ref.naturalHeight * k);
+    if (mode !== 'ref') { g.globalAlpha = mode === 'mix' ? 0.5 : 1; g.drawImage(mine, 0, 0); g.globalAlpha = 1; }
+    // metre grid
+    g.strokeStyle = 'rgba(255,0,80,0.35)'; g.fillStyle = '#c00'; g.font = '11px Consolas'; g.lineWidth = 1;
+    for (let m = Math.ceil(F.bounds[0]); m <= F.bounds[2]; m++) { const x = ox + m * ppm; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, Hh); g.stroke(); g.fillText(m, x + 2, Hh - 8); }
+    for (let m = Math.ceil(F.bounds[1]); m <= F.bounds[3]; m++) { const y = oz + m * ppm; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.fillText(m, 4, y - 2); }
+    window.__ready = true;
+  }).catch((e) => { g.fillStyle = '#fff'; g.font = '20px sans-serif'; g.fillText(e.message, 20, 40); window.__ready = true; });
+}
+</script>

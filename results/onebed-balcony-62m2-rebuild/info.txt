@@ -1,0 +1,31 @@
+One-bedroom flat with a balcony, 61.67 m2 - rebuild (data onebed62r), 2026-11-14
+
+PLAN IMAGE
+  https://x2.ge/assets/2d_render_images/68384ad39f075.webp  (plan.webp here; plan-turned.png = turned 180 deg)
+
+MEASUREMENTS (given areas -> built)
+  ჰოლი            4.24 -> 4.24
+  სამზარეულო      6.49 -> 6.49
+  საერთო ოთახი   18.87 -> 18.96 (+0.45 %)
+  საძინებელი     16.15 -> 16.17
+  WC              7.41 -> 7.40
+  აივანი          7.93 -> 7.93
+  Total 61.67 m2. Scale 55.8 px/m, origin px (195, 0) in the turned image. Outer box about 7.15 x 10.5 m incl. balcony.
+
+MOVED FOR THE AREAS
+  - East wall inner face 9 px (0.16 m) in.
+  - WC/hall wall 6 px (0.11 m) east; WC riser shaft narrowed to 0.54 m (drawn 0.75).
+  - Kitchen / living split (open plan) at plan y 168.8; hall / kitchen split at x 437.9.
+  - Balcony slab edge at y 584.6 (drawn rail line about 597).
+
+FILES
+  gen.py   writes source\flats\onebed62r.json (run from source: py "../results/onebed-balcony-62m2-rebuild/gen.py" 55.8 9 345 254 584.6)
+  scan.py  dark-pixel runs along rows/columns
+
+ESTIMATED COST WITH THE CLAUDE API (Claude Opus 5.5: $4 / M input, $20 / M output,
+  $0.20 / M cache reads, cache writes about $8 / M with the 1-hour cache)
+  About 15 model turns, context ~30K -> ~60K tokens.
+    cache reads   ~0.6 M tokens   ~$0.12
+    cache writes  ~0.07 M tokens  ~$0.56
+    output        ~0.02 M tokens  ~$0.40
+  Total about $1.1 (likely range $0.8-2). An estimate, not a billed figure.

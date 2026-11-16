@@ -1,0 +1,55 @@
+# Build Apartment Model
+
+Build an apartment model using the flat template in `"C:\Users\Jeko\Desktop\flat-3d - Copy`.
+
+- Plan image: https://x2.ge/assets/2d_render_images/667e7ffdb2aee.webp
+
+## Room areas
+
+საერთო ფართი 95.6 მ2
+
+ჰოლი	11.3 მ2
+საერთო ოთახი	30 მ2
+საძინებელი	22.1 მ2
+საძინებელი	21.7 მ2
+სანკვანძი	5.6 მ2
+აივანი	5.2 მ2
+## Instructions
+
+ 
+1. Read `"C:\Users\Jeko\Desktop\flat-3d - Copy\CLAUDE.md"` first and follow its Per-flat procedure.
+2. Write the apartment's JSON file only. If a furniture piece is missing, add it as a file in `furniture\` and run `tools\furniture-index.mjs`; touch `src\` only if an opening kind is missing.
+3. Start with `tools\trace.mjs`.
+4. If the walls are dark or the background is transparent and the tracer gives fragments, measure the walls from pixel scans as for previous apartments (see State).
+5. Turn the plan so its main windows face south.
+6. If the plan has diagonal or curved walls, tell me before building.
+7. Use the same style as the other apartments.
+8. Use Georgian room names with their specified areas.
+9. Leave people out; the entrance door stays shut.
+10. Place furniture where the image shows it, using the pieces in `FORMAT.md`. Keep walkways clear.
+11. If my areas and the picture disagree, trust the areas and tell me what you moved.
+12. for each flat create folder and text folder with plan image url and and measurements and price it would cost to create it with claude api
+
+## Completion criteria
+
+- `build.mjs` shows every room within 1% of its specified area.
+- The top-view overlay lines up with the original image.
+- `walktest.mjs` reports `RESULT: PASS` on desktop and touch.
+- The offline file is saved in `"C:\Users\Jeko\Desktop\flat-3d - Copy\results` using a descriptive, unique filename.
+- Publish the page as a new private artifact.
+- Add the apartment to the State section of `CLAUDE.md`, using its descriptive name rather than a flat number.
+
+## Cost constraints
+
+- Use approximately four screenshots.
+- Use text checks otherwise.
+- Do not ask questions unless blocked.
+
+## Final response
+
+Provide:
+1. Link to the offline HTML file.
+2. Link to the published private artifact.
+3. What you assumed.
+4. What you did not check.
+5. Confirmation that the apartment was added to the State section of `CLAUDE.md`.

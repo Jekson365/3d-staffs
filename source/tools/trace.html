@@ -1,0 +1,137 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Wall tracer</title>
+<!-- Used by tools/trace.mjs. Finds walls drawn in white (as in flat 1's render); partitions drawn in other colours are missed. trace(dataUrl, turn, area) turns the render (quarter turns anticlockwise), finds the walls
+     (opaque near-white pixels) and the outside (transparent pixels), and returns wall rectangles, free-floor rectangles,
+     the scale worked out from the total area, and the turned picture with an overlay. -->
+<body style="margin:0">
+<script>
+const load = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('cannot read the image')); i.src = src; });
+
+// Rectangles covering the set pixels of a mask (row-first, then grown downwards); claims what it covers.
+function rects(mask, W, H, minW, minH) {
+  const used = new Uint8Array(W * H), out = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x;
+    if (!mask[i] || used[i]) continue;
+    let x2 = x;
+    while (x2 + 1 < W && mask[i + x2 + 1 - x] && !used[i + x2 + 1 - x]) x2++;
+    let y2 = y;
+    for (;;) {
+      if (y2 + 1 >= H) break;
+      let ok = true;
+      for (let k = x; k <= x2; k++) { const j = (y2 + 1) * W + k; if (!mask[j] || used[j]) { ok = false; break; } }
+      if (!ok) break;
+      y2++;
+    }
+    for (let b = y; b <= y2; b++) for (let k = x; k <= x2; k++) used[b * W + k] = 1;
+    if (x2 - x + 1 >= minW && y2 - y + 1 >= minH) out.push([x, y, x2 + 1, y2 + 1]);
+  }
+  return out;
+}
+// Pull edge coordinates that lie within tol of each other onto one value.
+function snap(list, idx, tol) {
+  const vals = list.flatMap((r) => idx.map((k) => r[k])).sort((a, b) => a - b), map = new Map();
+  let group = [vals[0]];
+  const flush = () => { const cnt = new Map(); for (const v of group) cnt.set(v, (cnt.get(v) || 0) + 1); const best = [...cnt].sort((a, b) => b[1] - a[1])[0][0]; for (const v of group) map.set(v, best); };
+  for (let i = 1; i < vals.length; i++) { if (vals[i] - group[group.length - 1] <= tol) group.push(vals[i]); else { flush(); group = [vals[i]]; } }
+  if (vals.length) flush();
+  for (const r of list) for (const k of idx) r[k] = map.get(r[k]);
+}
+// Join rectangles that share a whole edge.
+function merge(list) {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    outer: for (let i = 0; i < list.length; i++) for (let j = 0; j < list.length; j++) {
+      if (i === j) continue;
+      const a = list[i], b = list[j];
+      if (a[0] === b[0] && a[2] === b[2] && a[3] === b[1]) { a[3] = b[3]; list.splice(j, 1); changed = true; break outer; }
+      if (a[1] === b[1] && a[3] === b[3] && a[2] === b[0]) { a[2] = b[2]; list.splice(j, 1); changed = true; break outer; }
+    }
+  }
+  return list.filter((r) => r[2] > r[0] && r[3] > r[1]);
+}
+
+async function trace(src, turn, area) {
+  const img = await load(src), k = (((turn || 0) / 90) % 4 + 4) % 4, w0 = img.naturalWidth, h0 = img.naturalHeight;
+  const W = k % 2 ? h0 : w0, H = k % 2 ? w0 : h0, cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  g.imageSmoothingEnabled = false;                     // a quarter turn must move pixels, not blend them
+  g.translate(W / 2, H / 2); g.rotate(-k * Math.PI / 2); g.drawImage(img, -w0 / 2, -h0 / 2); g.setTransform(1, 0, 0, 1, 0, 0);
+  const turned = cv.toDataURL('image/png'), d = g.getImageData(0, 0, W, H).data;
+  const wall = new Uint8Array(W * H), solid = new Uint8Array(W * H);
+  let bx0 = W, by0 = H, bx1 = 0, by1 = 0;
+  for (let i = 0; i < W * H; i++) {
+    const r = d[i * 4], gg = d[i * 4 + 1], b = d[i * 4 + 2], a = d[i * 4 + 3], lo = Math.min(r, gg, b), hi = Math.max(r, gg, b);
+    if (a > 128) { solid[i] = 1; const x = i % W, y = (i / W) | 0; if (x < bx0) bx0 = x; if (y < by0) by0 = y; if (x > bx1) bx1 = x; if (y > by1) by1 = y; }
+    if (a > 200 && lo > 236 && hi - lo < 14) wall[i] = 1;
+  }
+  // close one-pixel gaps (anti-aliased edges of thin partitions): dilate, then erode, with a 3 x 3 square
+  const morph = (src, grow) => {
+    const out = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let v = grow ? 0 : 1;
+      for (let dy = -1; dy <= 1 && v === (grow ? 0 : 1); dy++) for (let dx = -1; dx <= 1; dx++) {
+        const u = x + dx, w = y + dy, s = u >= 0 && w >= 0 && u < W && w < H ? src[w * W + u] : 0;
+        if (grow && s) { v = 1; break; } if (!grow && !s) { v = 0; break; }
+      }
+      out[y * W + x] = v;
+    }
+    return out;
+  };
+  const closed = morph(morph(wall, true), false);
+  for (let i = 0; i < W * H; i++) wall[i] = closed[i] && solid[i] ? 1 : 0;
+  // a first scale from the opaque area, used only to tell walls (thin, long) from white fixtures (baths, basins)
+  let opaque = 0; for (let i = 0; i < W * H; i++) opaque += solid[i];
+  const S0 = Math.sqrt(opaque * 0.85 / area);
+  // Walls are long thin strips: take runs of wall pixels at least 0.3 m long along each row (walls running east-west)
+  // and each column (north-south), stack runs on neighbouring lines that start and end within 3 px of each other,
+  // and keep the stacks no thicker than 0.45 m. Thicker stacks are white fixtures (baths, basins, beds).
+  const blobs = [];
+  const strips = (mask, horiz, minLen, maxThick, keepBlobs) => {
+    const nl = horiz ? H : W, nu = horiz ? W : H, at = (l, u) => (horiz ? mask[l * W + u] : mask[u * W + l]), open = [], done = [];
+    for (let l = 0; l <= nl; l++) {
+      const runs = [];
+      if (l < nl) for (let u = 0; u < nu;) { if (!at(l, u)) { u++; continue; } let e = u; while (e < nu && at(l, e)) e++; if (e - u >= minLen) runs.push([u, e]); u = e; }
+      const still = [];
+      for (const g of open) {
+        const k = runs.findIndex((r) => Math.abs(r[0] - g.s) <= 3 && Math.abs(r[1] - g.e) <= 3);
+        if (k >= 0) { const r = runs.splice(k, 1)[0]; g.s = Math.min(g.s, r[0]); g.e = Math.max(g.e, r[1]); g.l1 = l; still.push(g); } else done.push(g);
+      }
+      for (const r of runs) still.push({ s: r[0], e: r[1], l0: l, l1: l });
+      open.length = 0; open.push(...still);
+    }
+    const out = [];
+    for (const g of done) {
+      const r = horiz ? [g.s, g.l0, g.e, g.l1 + 1] : [g.l0, g.s, g.l1 + 1, g.e];
+      if (g.l1 - g.l0 + 1 <= maxThick) out.push(r); else if (horiz && keepBlobs) blobs.push(r);
+    }
+    return out;
+  };
+  // drop strips that lie inside another (a pier is found both ways), line up nearly equal edges, join neighbours
+  const tidy = (list) => {
+    list = list.filter((a, i) => !list.some((b, j) => j !== i && b[0] <= a[0] && b[1] <= a[1] && b[2] >= a[2] && b[3] >= a[3] && (j < i || b.some((v, k) => v !== a[k]))));
+    if (list.length) { snap(list, [0, 2], 3); snap(list, [1, 3], 3); }
+    return merge(list);
+  };
+  const L = Math.round(0.3 * S0), T = Math.round(0.45 * S0);
+  const walls = tidy(strips(wall, true, L, T, true).concat(strips(wall, false, L, T, true)));
+  // free floor: opaque and not wall; its pixel count over the given area sets the scale
+  const inWall = new Uint8Array(W * H);
+  for (const r of walls) for (let y = r[1]; y < r[3]; y++) for (let x = r[0]; x < r[2]; x++) inWall[y * W + x] = 1;
+  const free = new Uint8Array(W * H);
+  let n = 0;
+  for (let i = 0; i < W * H; i++) if (solid[i] && !inWall[i]) { free[i] = 1; n++; }
+  const S = Math.sqrt(n / area), minFree = Math.round(0.35 * S);
+  const freeRects = merge(rects(free, W, H, minFree, minFree)).filter((r) => (r[2] - r[0]) * (r[3] - r[1]) >= 0.25 * S * S);
+  // overlay: walls in red, free rectangles outlined in blue, numbered
+  g.fillStyle = 'rgba(255,0,0,0.55)'; for (const r of walls) g.fillRect(r[0], r[1], r[2] - r[0], r[3] - r[1]);
+  g.strokeStyle = 'rgba(0,90,255,0.9)'; g.fillStyle = 'rgb(0,60,200)'; g.font = 'bold 11px Consolas'; g.lineWidth = 1;
+  freeRects.forEach((r, i) => { g.strokeRect(r[0] + 0.5, r[1] + 0.5, r[2] - r[0] - 1, r[3] - r[1] - 1); g.fillText(String(i), r[0] + 3, r[1] + 12); });
+  g.strokeStyle = 'rgba(255,160,0,0.9)'; for (const r of blobs) g.strokeRect(r[0] + 0.5, r[1] + 0.5, r[2] - r[0] - 1, r[3] - r[1] - 1);
+  return JSON.stringify({ W, H, S, origin: [bx0, by0], size: [bx1 + 1 - bx0, by1 + 1 - by0], walls, free: freeRects, blobs, turned, overlay: cv.toDataURL('image/png') });
+}
+window.__ready = true;
+</script>

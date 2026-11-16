@@ -1,0 +1,38 @@
+One-bedroom flat, 159.2 m2 built (request said 150), unfurnished  (data name onebed150)
+Built 2026-11-14 with the flat-3d template in "flat-3d - Copy".
+
+PLAN IMAGE
+  C:\Users\Jeko\Downloads\floor-plan.jpg  (3460 x 2340 JPEG; copy saved here as plan.jpg)
+  Turned 180 degrees so the bathroom's north window faces south (the plan's only windows are in the WC).
+
+PAGES
+  Offline:   C:\Users\Jeko\Desktop\flat-3d - Copy\results\onebed-150m2.html
+  Published: https://claude.ai/artifact/UFw6csrtLzGH1cQT2E3yji  (private)
+
+ROOM AREAS
+  room          given   built
+  სამზარეულო    28.2    28.09  (-0.4 %)   about 6.11 x 4.59 m
+  საძინებელი    31.4    31.40  ( 0.0 %)   about 5.71 x 5.50 m
+  სანკვანძი (WC) 33.5   33.58  (+0.3 %)   about 6.11 x 5.49 m
+  მისაღები      -       66.09             L-shape; given by the drawing, not by the request
+  Total built 159.2. The request's total 150 would leave the living room 56.9 m2 (14 % below its drawn
+  shape at the scale the other three rooms fix), so the drawing was kept. The plan's own living-room label (158.6) is wrong for its shape.
+
+MEASUREMENTS
+  Scale 196.27 px per metre (from the bedroom's 31.4). Whole plan 16.40 x 10.70 m outside.
+  Outer walls 0.25 m, partitions 0.10 m, ceiling 2.70. WC/kitchen wall moved 1 cm north.
+  Doors 1.62 m wide as drawn (entrance on the west wall, shut). Windows: WC north and east, sill 1.2.
+
+FURNITURE
+  None drawn on the plan, none built (only ceiling lights; living-room downlights on by day since it has no windows).
+  Add pieces in the page with the Furniture panel (G).
+
+FILES
+  gen.py   writes source\flats\onebed150.json and ref\onebed150.png (run from source: py ../results/onebed-150m2/gen.py)
+  scan.py  dark-pixel runs along rows/columns of the plan image
+
+ESTIMATED COST WITH THE CLAUDE API (Claude Opus 5.5: $4 / M input, $20 / M output, $0.20 / M cache reads,
+  about $8 / M cache writes with the 1-hour cache)
+  About 14 model turns, context ~40K-60K tokens, 4 images.
+    cache reads ~0.7 M ~$0.14 · cache writes ~0.07 M ~$0.56 · output ~0.01 M ~$0.20
+  Total about $1 (likely range $0.7-1.5). An estimate, not a billed figure.

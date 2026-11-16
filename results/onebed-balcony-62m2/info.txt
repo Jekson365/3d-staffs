@@ -1,0 +1,50 @@
+One-bedroom flat with a balcony, 61.67 m2  (data name onebed62)
+Built 2026-11-14 with the flat-3d template in "flat-3d - Copy".
+
+PLAN IMAGE
+  https://x2.ge/assets/2d_render_images/68384ad39f075.webp
+  (790 x 600 WebP with transparency; saved here as plan.webp)
+  Turned 180 degrees so the balcony glazing faces south.
+
+PAGES
+  Offline:   C:\Users\Jeko\Desktop\flat-3d - Copy\results\onebed-balcony-62m2.html
+  Published: https://claude.ai/artifact/QHfn4TPZjqBHioAVc23e7j  (private)
+
+ROOM AREAS (given -> built from the walls)
+  საერთო ფართი (total)     61.67  (the six given areas add up to 61.09)
+  ჰოლი                      4.24  -> 4.27   (+0.8 %)
+  სამზარეულო                6.49  -> 6.49   (0.0 %)   open to the living room, includes the dining table
+  საერთო ოთახი             18.87  -> 18.87  (0.0 %)
+  საძინებელი               16.15  -> 16.14  (-0.1 %)  includes the nook at its door
+  WC                        7.41  -> 7.37   (-0.5 %)  includes the shower recess
+  აივანი                    7.93  -> 7.93   (0.0 %)
+
+MEASUREMENTS (metres; scale 55.8 px per metre; outer north-west corner at px (195, 0) of the turned image)
+  Whole plan, outside faces incl. balcony     7.15 x 10.51
+  Ceiling height                              2.70
+  Living room                                 3.28 wide x 5.97 long
+  Kitchen (open plan)                         2.40 x 2.82
+  Bedroom                                     3.12 x 4.82, plus a 1.20 x 1.18 nook at the door
+  WC                                          2.15 x 2.69, plus a 1.52 x 1.18 shower recess
+  Hall                                        1.63 x 2.69
+  Balcony                                     6.36 x 1.33
+  Outer walls 0.20 (east wall 0.36), partitions 0.09-0.11, piers beside the balcony glazing
+  Doors 0.77-0.99; entrance 1.06 in the north wall; two glazed balcony doors with fixed panes
+
+MOVED FOR THE AREAS
+  - Living room + kitchen were drawn about 1.2 m2 larger than given: the east outer wall's inner face moved 0.16 m in.
+  - WC was drawn about 0.4 m2 short (the riser shaft is not floor): bathroom/hall wall moved 0.11 m east into the hall,
+    and the bathroom's riser shaft drawn 0.48 m wide instead of 0.75.
+  - Kitchen / living split (open plan, no wall) set just south of the dining table so the kitchen is 6.49.
+
+FILES
+  gen.py   writes source\flats\onebed62.json (run from source: py -I "../results/onebed-balcony-62m2/gen.py" 55.8 9 344 251 586.5)
+  scan.py  dark-pixel runs along rows/columns of the plan image
+
+ESTIMATED COST WITH THE CLAUDE API (Claude Opus 5.5: $4 / M input, $20 / M output,
+  $0.20 / M cache reads, cache writes about $8 / M with the 1-hour cache)
+  About 22 model turns, context growing from ~30K to ~75K tokens.
+    cache reads   ~1.1 M tokens   ~$0.22
+    cache writes  ~0.09 M tokens  ~$0.72
+    output        ~0.02 M tokens  ~$0.40   (incl. thinking)
+  Total about $1.4 (likely range $1-2.5). An estimate from the session's shape, not a billed figure.

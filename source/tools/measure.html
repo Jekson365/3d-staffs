@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Measure a plan image</title>
+<!-- Enlarged, gridded crops of a reference image, for reading wall and furniture positions in image pixels.
+       node tools/shot.mjs tools/measure.html dist/shots/m 1260 1200 "load('../ref/plan-render.webp').then(() => crop(160, 0, 210, 200, 6, 10))"
+     load(src)                 loads an image (path relative to this file); resolves to "WIDTHxHEIGHT"
+     crop(x, y, w, h, s, grid) draws that part enlarged s times with a pixel grid every `grid` px, labelled in image pixels;
+                               use a window of w*s by h*s. Magenta = transparent pixels (outside the flat).
+     px(x, y, w, h)            raw RGBA values of a region, row by row -->
+<style>html, body { margin: 0; background: #666; overflow: hidden; } canvas { display: block; }</style>
+<canvas id="c"></canvas>
+<script>
+let img = null;
+const c = document.getElementById('c'), g = c.getContext('2d');
+window.load = (src) => new Promise((res, rej) => {
+  const i = new Image();
+  i.onload = () => { img = i; res(i.naturalWidth + 'x' + i.naturalHeight); };
+  i.onerror = () => rej(new Error('cannot load ' + src));
+  i.src = src;
+});
+window.crop = (x, y, w, h, s, grid) => {
+  c.width = Math.round(w * s); c.height = Math.round(h * s);
+  g.imageSmoothingEnabled = s < 3; g.imageSmoothingQuality = 'high';
+  g.fillStyle = '#f0f'; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(img, x, y, w, h, 0, 0, c.width, c.height);
+  if (!grid) return;
+  g.font = '11px Consolas'; g.textBaseline = 'top'; g.lineWidth = 1;
+  for (let gx = Math.ceil(x / grid) * grid; gx <= x + w; gx += grid) {
+    const p = (gx - x) * s;
+    g.strokeStyle = gx % (grid * 5) === 0 ? 'rgba(255,0,0,.8)' : 'rgba(255,0,0,.35)';
+    g.beginPath(); g.moveTo(p + 0.5, 0); g.lineTo(p + 0.5, c.height); g.stroke();
+    g.fillStyle = '#000'; g.fillRect(p + 2, 1, 26, 12); g.fillStyle = '#ff0'; g.fillText(gx, p + 3, 2);
+  }
+  for (let gy = Math.ceil(y / grid) * grid; gy <= y + h; gy += grid) {
+    const p = (gy - y) * s;
+    g.strokeStyle = gy % (grid * 5) === 0 ? 'rgba(0,0,255,.8)' : 'rgba(0,0,255,.35)';
+    g.beginPath(); g.moveTo(0, p + 0.5); g.lineTo(c.width, p + 0.5); g.stroke();
+    g.fillStyle = '#000'; g.fillRect(1, p + 2, 26, 12); g.fillStyle = '#0ff'; g.fillText(gy, 2, p + 3);
+  }
+};
+window.px = (x, y, w, h) => {
+  const t = document.createElement('canvas');
+  t.width = img.naturalWidth; t.height = img.naturalHeight;
+  const tg = t.getContext('2d');
+  tg.drawImage(img, 0, 0);
+  return Array.from(tg.getImageData(x, y, w, h).data);
+};
+window.__ready = true;
+</script>

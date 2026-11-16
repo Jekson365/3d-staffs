@@ -1,0 +1,41 @@
+One-bedroom flat, 159.2 m2 built (request said 150), five windows, unfurnished  (data name onebed150w)
+Built 2026-11-14 with the flat-3d template in "flat-3d - Copy".
+
+PLAN IMAGE
+  C:\Users\Jeko\Downloads\floor-plan (3).jpg  (3528 x 2473 JPEG; copy saved here as plan.jpg)
+  Same walls as onebed150 (floor-plan.jpg) but with five windows drawn.
+  Turned 180 degrees: the plan's top wall (bedroom + bathroom windows) now faces south.
+
+PAGES
+  Offline:   C:\Users\Jeko\Desktop\flat-3d - Copy\results\onebed-150m2-five-windows.html
+  Published: https://claude.ai/artifact/TKFSCzaADuU4ZvqMzuDMTs  (private)
+
+ROOM AREAS
+  room           given   built
+  სამზარეულო     28.2    28.09  (-0.4 %)   about 6.11 x 4.60 m
+  საძინებელი     31.4    31.39  ( 0.0 %)   about 5.71 x 5.50 m
+  სანკვანძი (WC) 33.5    33.57  (+0.2 %)   about 6.11 x 5.49 m
+  მისაღები       -       66.10             L-shape; from the drawing, not the request
+  Total built 159.2. A 150 total would leave the living room 56.9 m2 (14 % below its drawn shape at the scale
+  the other three rooms set), so the drawing was kept. The plan's own living-room label (158.6) does not fit its shape.
+
+MEASUREMENTS
+  Scale 196.3 px per metre (from the bedroom's 31.4). Whole plan 16.40 x 10.70 m outside.
+  Outer walls 0.25 m, partitions 0.10 m, ceiling 2.70 (plan says 2.80; kept the template's 2.70).
+  Bath/kitchen wall 2 px (1 cm) north of drawn. Doors 0.75 m wide (drawn 1.62; hinge end kept where drawn; entrance shut).
+  Windows (plan labels W x H cm): bedroom 130x240 and bathroom 130x240 (south after turning) and
+  bathroom 130x240 (west after turning): 1.33 m wide, sill 0.3, head 2.6.
+  Kitchen 240x150 on two walls: 2.46 m wide, sill 0.9, head 2.4.
+
+FURNITURE
+  None drawn, none built (ceiling lights only). Add pieces in the page with the Furniture panel (G).
+
+FILES
+  gen.py   writes source\flats\onebed150w.json and ref\onebed150w.png (run from source: py ../results/onebed-150m2-five-windows/gen.py)
+  scan.py  dark-pixel runs and light gaps along rows/columns of the plan image
+
+ESTIMATED COST WITH THE CLAUDE API (Claude Opus 5.5: $4 / M input, $20 / M output, $0.20 / M cache reads,
+  about $8 / M cache writes with the 1-hour cache)
+  About 12 model turns, context ~45K-60K tokens, 4 images.
+    cache reads ~0.6 M ~$0.12 · cache writes ~0.06 M ~$0.48 · output ~0.01 M ~$0.20
+  Total about $0.8 (likely range $0.6-1.2). An estimate, not a billed figure.
