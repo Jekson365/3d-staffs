@@ -186,6 +186,7 @@ Update this section whenever it changes.
   (fixed glass and a glazed door in each), bedroom 14.6 is a `poly` with a slanted outer wall and a thin glazed slant (door) to the small balcony; both balconies are triangular `poly`.
   The two air shafts by the hall are one `shafts` block. Moved for the areas: living north (now west) wall 0.12 m out, hall/bedroom wall 3 px, small balcony rails about 0.2 m out.
   Total 122 is the given figure (rooms add to 116.5). Both walk tests pass; overlay lines up.
+- 2026-11-16 engine (backup `backupsource-before-walk-through-2026-11-16.tgz`): **Through** button / key N (`#bGhost`, `setGhost`, `S.ghost`, hook `__flat.ghost(on)`): walking ignores walls, doors and furniture but stays inside the flat's bounds; off by default, turning it off steps you back out of a wall. Every flat built from now on has it; rebuilt so far: twobed122 (both walk tests pass, tested walking through a wall). Other results flats keep their old page until rebuilt.
 - Per-flat output in this copy: one folder `results\<descriptive name>\` holding the offline page, plan image, `info.txt` (URL, measurements, cost), scripts.
   Since 2026-11-16 the pages live inside those folders (moved, `../furniture` rewritten to `../../furniture`; checked: a moved page opened as a file loads all 51 pieces).
   `build.mjs` alone writes the offline page to `..\<file>.html`: pass the folder path, e.g. `node tools/build.mjs threebed80 "../results/threebed-80m2/threebed-balcony-82m2.html"`.

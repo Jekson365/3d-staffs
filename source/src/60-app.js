@@ -36,7 +36,7 @@ async function boot() {
   // S: everything that changes while the page runs
   const S = {
     mode: 'plan', fly: null, x: START[0], z: START[1], yaw: START[2] * DEG, pitch: 0, vx: 0, vz: 0, bob: 0,
-    theta: 0, phi: 0, dist: 24, userView: false, eve: 0, eveWant: 0, locked: false, noLock: false, touch: coarse,
+    theta: 0, phi: 0, dist: 24, userView: false, eve: 0, eveWant: 0, locked: false, noLock: false, touch: coarse, ghost: false,
     room: null, dirty: 3, pr: Math.min(window.devicePixelRatio || 1, coarse ? 2 : 1.5), ready: false,
   };
 
@@ -420,7 +420,8 @@ async function boot() {
     return true;
   };
   const settle = (p) => {
-    for (let it = 0; it < 4; it++) {
+    // Through (N): no walls, doors or furniture stop you; you still stay inside the flat's outline
+    for (let it = 0; it < 4 && !S.ghost; it++) {
       let moved = false;
       for (const c of COL) if (!(S.empty && c.furn) && pushOut(p, c)) moved = true;
       for (const d of DOORS) if (pushOut(p, d.col)) moved = true;
@@ -556,6 +557,10 @@ async function boot() {
     else if (S.mode === 'walk') goPlan();
   };
   const toggleEve = () => { S.eveWant = S.eveWant ? 0 : 1; syncUI(); S.dirty = 3; };
+  const setGhost = (on) => {
+    S.ghost = !!on; $('bGhost').setAttribute('aria-pressed', S.ghost ? 'true' : 'false');
+    if (!S.ghost && S.mode === 'walk') { const P = { x: S.x, z: S.z }; settle(P); S.x = P.x; S.z = P.z; }   // step back out of a wall
+  };
 
   // ---- input ----
   const K = {}, stick = { id: 0, bx: 0, by: 0, x: 0, y: 0 }, pts = new Map();
@@ -677,6 +682,7 @@ async function boot() {
     else if (e.code === 'KeyF') fullscreen();
     else if (e.code === 'KeyH' || e.code === 'Slash') toggleHelp();
     else if (e.code === 'KeyX') setEmpty(!S.empty);
+    else if (e.code === 'KeyN') setGhost(!S.ghost);
     else if (e.code === 'KeyT') toggleFin();
     else if (e.code === 'KeyG') toggleEdit();
     else if (S.edit && sel && e.code === 'KeyR') turnSel(e.shiftKey ? 1 : -1);
@@ -822,7 +828,7 @@ async function boot() {
 
   const press = (id, fn) => $(id).addEventListener('click', (e) => { fn(); e.currentTarget.blur(); canvas.focus({ preventScroll: true }); });
   press('bMode', toggleMode); press('bEve', toggleEve); press('bHelp', toggleHelp); press('bFull', fullscreen);
-  press('bEmpty', () => setEmpty(!S.empty)); press('bFin', toggleFin); press('bEdit', () => toggleEdit());
+  press('bEmpty', () => setEmpty(!S.empty)); press('bGhost', () => setGhost(!S.ghost)); press('bFin', toggleFin); press('bEdit', () => toggleEdit());
   if (document.fullscreenEnabled && app.requestFullscreen) $('bFull').hidden = false;
 
   // ---- furniture: pick a piece, drag it, turn it, take it away or add one; kept per flat in this browser ----
@@ -1359,7 +1365,7 @@ async function boot() {
 
   // hooks for checking the page from scripts
   window.__flat = {
-    empty: (on) => setEmpty(on), finish: (key, id) => setFinish(key, id), surfaces: SURF,
+    empty: (on) => setEmpty(on), ghost: (on) => setGhost(on), finish: (key, id) => setFinish(key, id), surfaces: SURF,
     furniture: {
       edit: toggleEdit, pieces: () => PIECE_RECS.filter((r) => r.p), pick: pickAt, select, selected: () => sel,
       move: (rec, dx, dz) => setPiece(rec, movedP(rec.p, dx, dz)), turn: (rec, dir) => setPiece(rec, turnedP(rec.p, dir)), remove: (rec) => setPiece(rec, null),
