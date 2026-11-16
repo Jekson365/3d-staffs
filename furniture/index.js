@@ -15,6 +15,7 @@
   'block',
   'box',
   'ceilingLamp',
+  'channelCornerSofa',
   'closet',
   'coatBench',
   'coffeeTable',

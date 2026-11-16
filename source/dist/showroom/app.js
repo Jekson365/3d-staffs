@@ -1,6 +1,5 @@
-(() => {
 'use strict';
-const FLAT = {"name":"showroom","file":"showroom","title":{"ka":"შოურუმი","en":"Showroom: modular sofa","rooms":"1 room"},"start":[2.45,3.55,0],"rooms":[{"id":"living","ka":"საერთო ოთახი","en":"Living room","area":18,"rects":[[0.2,0.2,4.7,4.2]],"label":[2.45,3.6],"floor":{"mat":"floorLiv","uv":"plank","off":[0.31,0.2]}}],"walls":[[0,0,4.9,0.2],[0,4.2,4.9,4.4],[0,0.2,0.2,4.2],[4.7,0.2,4.9,4.2]],"shafts":[],"openings":[{"id":"entry","kind":"entry","axis":"z","at":[4.7,4.9],"a":2.9,"b":3.85,"handle":"a"},{"id":"winLiv","kind":"window","axis":"x","at":[4.2,4.4],"a":1.45,"b":3.45}],"rails":[],"switches":[[4.7,2.7,-90]],"furniture":[{"t":"modularSofa","x":2.45,"z":0.63},{"t":"rug","mat":"rugTri","rect":[1.25,1.2,3.65,2.9]},{"t":"coffeeTable","x":1.75,"z":1.95},{"t":"floorLamp","x":0.55,"z":0.55},{"t":"plantLeafy","x":4.3,"z":0.6,"seed":3,"h":1.4,"n":16,"leaf":0.3,"mats":["leafA","leafA","leafD"],"pot":"pot","potR":0.17,"potH":0.34},{"t":"downlight","x":1.3,"z":1.2},{"t":"downlight","x":3.6,"z":1.2},{"t":"downlight","x":1.3,"z":3.2},{"t":"downlight","x":3.6,"z":3.2},{"t":"ceilingLamp","x":2.45,"z":2.2,"s":0.22,"I":1.6,"col":"SOFT","ch":2}],"bounds":[0,0,4.9,4.4],"map":{"x0":-0.2,"z0":-0.2,"w":5.3,"d":4.8},"digits":1,"total":18};
+const FLAT = {"name":"showroom","file":"showroom","title":{"ka":"შოურუმი","en":"Showroom: corner sofa","rooms":"1 room"},"start":[2.45,3.55,0],"rooms":[{"id":"living","ka":"საერთო ოთახი","en":"Living room","area":18,"rects":[[0.2,0.2,4.7,4.2]],"label":[2.45,3.6],"floor":{"mat":"floorLiv","uv":"plank","off":[0.31,0.2]}}],"walls":[[0,0,4.9,0.2],[0,4.2,4.9,4.4],[0,0.2,0.2,4.2],[4.7,0.2,4.9,4.2]],"shafts":[],"openings":[{"id":"entry","kind":"entry","axis":"z","at":[4.7,4.9],"a":2.9,"b":3.85,"handle":"a"},{"id":"winLiv","kind":"window","axis":"x","at":[4.2,4.4],"a":1.45,"b":3.45}],"rails":[],"switches":[[4.7,2.7,-90]],"furniture":[{"t":"channelCornerSofa","x":2.45,"z":0.68},{"t":"rug","mat":"rugTri","rect":[1.25,1.2,3.65,2.9]},{"t":"coffeeTable","x":3.1,"z":1.8},{"t":"floorLamp","x":0.55,"z":0.55},{"t":"plantLeafy","x":4.3,"z":0.6,"seed":3,"h":1.4,"n":16,"leaf":0.3,"mats":["leafA","leafA","leafD"],"pot":"pot","potR":0.17,"potH":0.34},{"t":"downlight","x":1.3,"z":1.2},{"t":"downlight","x":3.6,"z":1.2},{"t":"downlight","x":1.3,"z":3.2},{"t":"downlight","x":3.6,"z":3.2},{"t":"ceilingLamp","x":2.45,"z":2.2,"s":0.22,"I":1.6,"col":"SOFT","ch":2}],"bounds":[0,0,4.9,4.4],"map":{"x0":-0.2,"z0":-0.2,"w":5.3,"d":4.8},"digits":1,"total":18};
 // ---------- 10-util.js : maths, geometry batching, primitive builders ----------
 const T = THREE;
 const PI = Math.PI, TAU = PI * 2, DEG = PI / 180;
@@ -1671,7 +1670,44 @@ function buildPlan() {
   for (const [x, z, r] of FLAT.switches || []) place(x, 1.05, z, r * DEG, () => { B('switch', 0, -0.041, 0.005, 0.082, 0.082, 0.01); B('switch', 0, -0.03, 0.011, 0.034, 0.06, 0.004); });
 }
 
-// ---------- 40-furn.js : the furniture catalogue ----------
+// ---------- 40-furn.js : the furniture registry ----------
+// The pieces themselves live in the shared folder furniture/ at the top of the project, one file per piece, and every
+// flat page loads them from there (furniture/_parts.js first, then the rest). A piece file calls
+//   piece('name', { name: 'Panel label', add: position in the Add list, values: { its Add defaults } }, function (p) { ... });
+// FLAT.furniture lists the pieces of a flat: { "t": piece name, "x", "z", "r": turn in degrees, ...its own values }.
+const PIECES = {}, PIECE_INFO = {};
+function piece(t, info, fn) { PIECES[t] = fn; PIECE_INFO[t] = info || {}; }
+
+// Every piece of furniture gets batches of its own, so the Furniture panel can move, turn or take away one piece while
+// the page runs, and the "Empty" button can hide them all. Built-in ceiling lights (FIXED) stay with the shell.
+// A piece's lamps, looking glasses and colliders go into LAMPS, MIRRORS and COL as usual, marked furn and listed on its
+// record; its light stand-ins are kept on the record only, so OCC holds the shell's.
+const FIXED = { downlight: 1, ceilingLamp: 1 };
+const PIECE_RECS = [];
+// Builds piece p into rec (a new record if none): rec.map, rec.ceil, rec.caps hold its batches.
+function buildPiece(p, rec) {
+  const fn = PIECES[p.t];
+  if (!fn) throw new Error('no piece called "' + p.t + '" (flats/FORMAT.md lists them)');
+  rec = Object.assign(rec || {}, { p, map: new Map(), ceil: new Map(), caps: new Map() });
+  const l0 = LAMPS.length, m0 = MIRRORS.length, c0 = COL.length, o0 = OCC.box.length, a0 = OCC.alb.length, save = TARGET, saveM = CUR;
+  OCC_SETS.add(rec.map);
+  REMAP.set(CEIL, rec.ceil); REMAP.set(CAPS, rec.caps); TARGET = rec.map; CUR = new T.Matrix4();
+  try { fn(p); } finally { TARGET = save; CUR = saveM; REMAP.clear(); OCC_SETS.delete(rec.map); }
+  rec.lamps = LAMPS.slice(l0); rec.mirrors = MIRRORS.slice(m0); rec.cols = COL.slice(c0);
+  rec.occBox = OCC.box.splice(o0); rec.occAlb = OCC.alb.splice(a0);
+  for (const a of [rec.lamps, rec.mirrors, rec.cols]) for (const q of a) q.furn = true;
+  return rec;
+}
+function buildFurniture() {
+  (FLAT.furniture || []).forEach((p, i) => {
+    if (!PIECES[p.t]) throw new Error('furniture[' + i + ']: no piece called "' + p.t + '" (flats/FORMAT.md lists them)');
+    if (FIXED[p.t] || p.fixed) PIECES[p.t](p);
+    else PIECE_RECS.push(buildPiece(p));
+  });
+}
+
+// ---------- furniture/_parts.js : shared parts and helpers for the pieces in this folder ----------
+// Loaded before every piece file. The engine (source/src) provides the builders (B, BX, place, lamp, ...).
 // FLAT.furniture lists the pieces of a flat: { "t": piece name, "x", "z", "r": turn in degrees, ...its own values }.
 // PIECES below holds every piece; flats/FORMAT.md lists them with their values. A piece's "native" direction is how
 // it stands at r 0; r turns it anticlockwise seen from above (90 turns a piece facing south to face east).
@@ -1844,656 +1880,749 @@ function doubleBed() {
   colRect(-1.13, -0.99, 0.98, 0.99);
 }
 
-// ---- the catalogue ----
-const PIECES = {
-  // -- lights (world positions) --
-  downlight(p) { downlight(p.x, p.z, p.I || 0.75, colOf(p.col), p.ch || 2); },              // recessed spot: I, col, ch
-  ceilingLamp(p) { ceilingLamp(p.x, p.z, p.s || 0.16, p.I || 1, colOf(p.col), p.ch || 1); }, // flush dish of radius s
-  pendant(p) { pendant(p.x, p.z, p.y || 1.55); },                                           // black dome, evening only; y: its rim
-  wallLight(p) {                                                    // native: on an east wall, facing west; (x, z) on the wall face
-    pAt(p, () => {
-      BX('alu', -0.04, 1.92, -0.06, 0, 2.08, 0.06, { occ: false });
-      BX('lampEve', -0.036, 1.914, -0.05, -0.004, 1.92, 0.05); BX('lampEve', -0.036, 2.08, -0.05, -0.004, 2.086, 0.05);
-      pLamp(-0.15, 1.9, 0, 0.7, SOFT, 2, { glow: 0.45 });
-    });
-  },
-  floorLamp(p) {                                                    // drum shade on a stem, lit day and evening
-    pAt(p, () => {
-      CY('blackMetal', 0, 0, 0, 0.15, 0.16, 0.02, { seg: 24 }); BAR('blackMetal', [0, 0.02, 0], [0, 1.36, 0], 0.011, { seg: 8 });
-      CY('lampOn', 0, 1.3, 0, 0.15, 0.19, 0.27, { seg: 28, open: true, occ: false }); CY('lampOn', 0, 1.3, 0, 0.19, 0.19, 0.002, { seg: 28, occ: false });
-      colCircle(0, 0, 0.16);
-      pLamp(0, 1.42, 0, 0.85, WARM, 1, { glow: 0.9 });
-    });
-  },
-
-  // -- plants --
-  plantLeafy(p) { plantLeafy(p.x, p.z, p); },                       // seed, h, n, leaf, stems, ratio, mats, pot, potR, potH, y
-  plantSpiky(p) { plantSpiky(p.x, p.z, p); },                       // seed, n, len, wid, mats, pot, potR, potH, y
-  planter(p) {                                                      // square pot with a round bush; seed
-    pAt(p, () => {
-      BX('pot', -0.2, 0, -0.2, 0.2, 0.38, 0.2, { cell: 0.2 });
-      BX('soil', -0.18, 0.36, -0.18, 0.18, 0.37, 0.18, { occ: false });
-      colRect(-0.2, -0.2, 0.2, 0.2);
-      bush(0, 0.34, 0, 0.31, p.seed || 21);
-    });
-  },
-
-  // -- bathroom --
-  bath(p) {   // built-in bath, rect with its long side along Z. mixer 'w'|'e': the tap wall; head 'n'|'s': the shower end;
-    //           rain (overhead shower on the head wall), screen (glass at the head end): true unless false; hole [w, d]
-    if (p.along === 'x') {                                           // long side along X: build it along Z, turned a quarter
-      const [a0, b0, a1, b1] = p.rect, cx = (a0 + a1) / 2, cz = (b0 + b1) / 2, hw = (a1 - a0) / 2, hd = (b1 - b0) / 2;
-      const nc = COL.length, no = OCC.box.length;                    // turned frame: world (x, z) = (cx + lz, cz - lx)
-      place(cx, 0, cz, Math.PI / 2, () => PIECES.bath({ ...p, along: undefined, rect: [-hd, -hw, hd, hw] }));
-      for (let i = nc; i < COL.length; i++) {
-        const c = COL[i]; if (c.k !== 0) continue;
-        [c.x0, c.z0, c.x1, c.z1] = [cx + c.z0, cz - c.x1, cx + c.z1, cz - c.x0];
-      }
-      for (let i = no; i < OCC.box.length; i += 6) {
-        const [x0, y0, z0, x1, y1, z1] = OCC.box.slice(i, i + 6);
-        OCC.box.splice(i, 6, cx + z0, y0, cz - x1, cx + z1, y1, cz - x0);
-      }
-      return;
-    }
-    const [x0, z0, x1, z1] = p.rect, top = 0.58, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0, cer = albOf('ceramic');
-    const hole = p.hole || [w - 0.26, d - 0.275], sx = p.mixer === 'e' ? -1 : 1, sz = p.head === 's' ? -1 : 1, N = { occ: false, cell: 0.3 };
-    const X = (u) => (sx > 0 ? x0 + u : x1 - u), Z = (v) => (sz > 0 ? z0 + v : z1 - v);    // u out from the tap wall, v from the shower end
-    rim('ceramic', cx, top, cz, w, d, hole[0], hole[1], 0.2);
-    basin('ceramic', cx, top, cz, hole[0], hole[1], 0.44, 0.2);
-    BXS('ceramic', X(w - 0.018), 0, z0, X(w), top - 0.001, z1, N);
-    BXS('ceramic', X(0), 0, Z(d - 0.018), X(w - 0.018), top - 0.001, Z(d), N);
-    occBox(x1 - 0.13, 0, z0, x1, top, z1, cer); occBox(x0, 0, z0, x0 + 0.13, top, z1, cer);
-    occBox(x0, 0, z1 - 0.137, x1, top, z1, cer); occBox(x0, 0, z0, x1, top, z0 + 0.137, cer); occBox(x0, 0, z0, x1, 0.14, z1, cer);
-    COL.push({ k: 0, x0, z0, x1, z1 });
-    CY('chrome', cx, top - 0.438, Z(d / 2 + 0.55), 0.028, 0.028, 0.004, { seg: 14 });
-    const m = d / 2;                                                // wall mixer halfway along, with hose and hand shower
-    BXS('chrome', X(0), 0.74, Z(m - 0.09), X(0.045), 0.795, Z(m + 0.09));
-    TU('chrome', [[X(0.03), 0.765, Z(m)], [X(0.13), 0.765, Z(m)], [X(0.17), 0.735, Z(m)]], 0.013, { seg: 8 });
-    CY('chrome', X(0.022), 0.8, Z(m - 0.06), 0.014, 0.014, 0.03, { seg: 10 }); CY('chrome', X(0.022), 0.8, Z(m + 0.06), 0.014, 0.014, 0.03, { seg: 10 });
-    TU('chrome', [[X(0.03), 0.75, Z(m + 0.08)], [X(0.09), 0.66, Z(m + 0.16)], [X(0.06), 0.72, Z(m + 0.3)], [X(0.022), 0.96, Z(m + 0.36)], [X(0.022), 1.12, Z(m + 0.36)]], 0.007, { seg: 6, n: 30 });
-    CY('chrome', X(0.022), 1.1, Z(m + 0.36), 0.013, 0.013, 0.16, { seg: 8, rx: 0.5 * sz });
-    CY('chrome', X(0.035), 1.245, Z(m + 0.41), 0.04, 0.04, 0.014, { seg: 14, rz: -1.1 * sx });
-    if (p.rain !== false) {
-      BAR('chrome', [cx, 1.0, Z(0.012)], [cx, 2.12, Z(0.012)], 0.011, { seg: 8 });
-      TU('chrome', [[cx, 2.1, Z(0.012)], [cx, 2.16, Z(0.055)], [cx, 2.16, Z(0.315)]], 0.011, { seg: 8 });
-      CY('chrome', cx, 2.125, Z(0.315), 0.115, 0.115, 0.012, { seg: 24 });
-    }
-    if (p.screen !== false) { BXS('glass', X(w - 0.016), top, Z(0.015), X(w - 0.008), 2.0, Z(0.855)); BXS('chrome', X(w - 0.022), top, Z(0), X(w - 0.002), 2.0, Z(0.017)); }
-    CY('teal', X(0.18), top, Z(0.085), 0.032, 0.032, 0.17, { seg: 12 }); CY('paper', X(0.26), top, Z(0.075), 0.028, 0.028, 0.14, { seg: 12 }); CY('ochre', X(0.33), top, Z(0.09), 0.026, 0.03, 0.11, { seg: 12 });
-  },
-  toilet(p) {                                                       // native: back to a north wall at (x, z), facing south
-    const cer = albOf('ceramic');
-    pAt(p, () => {
-      RB('ceramic', 0, 0.4, 0.105, 0.38, 0.36, 0.17, 0.03);
-      RB('ceramic', 0, 0.76, 0.105, 0.395, 0.022, 0.185, 0.008);
-      CY('chrome', 0, 0.782, 0.105, 0.022, 0.022, 0.006, { seg: 14 });
-      LA('ceramic', 0, 0, 0.43, [[0.001, 0], [0.12, 0], [0.13, 0.12], [0.185, 0.36], [0.195, 0.4], [0.15, 0.4], [0.12, 0.3], [0.06, 0.25], [0.001, 0.24]], { seg: 24, sz: 1.3 });
-      CY('ceramic', 0, 0.4, 0.43, 0.2, 0.2, 0.022, { seg: 28, sz: 1.3 });
-      BX('ceramic', -0.1, 0.1, 0.19, 0.1, 0.4, 0.27, { occ: false });
-      occLocal(xf(0, 0.2, 0.43), 0.3, 0.4, 0.42, cer);
-      colRect(-0.2, 0, 0.2, 0.7);
-    });
-  },
-  vanity(p) {   // wall-hung walnut unit 0.77 wide with a vessel basin, mirror and light bar. native: back to a north wall, facing south. zone
-    pAt(p, () => {
-      B('walnut', 0, 0.36, 0.255, 0.77, 0.44, 0.51);
-      BX('plinth', -0.385, 0.577, 0.508, 0.385, 0.583, 0.513, { occ: false });
-      BX('blackMetal', -0.155, 0.7, 0.51, 0.155, 0.712, 0.53, { occ: false }); BX('blackMetal', -0.155, 0.48, 0.51, 0.155, 0.492, 0.53, { occ: false });
-      const vz = 0.29, vt = 0.93;
-      rim('ceramic', 0, vt, vz, 0.62, 0.42, 0.56, 0.36, 0.05);
-      basin('ceramic', 0, vt, vz, 0.56, 0.36, 0.11, 0.05, { free: true });
-      BX('ceramic', -0.31, 0.8, vz - 0.21, 0.31, vt - 0.001, vz - 0.192, { occ: false }); BX('ceramic', -0.31, 0.8, vz + 0.192, 0.31, vt - 0.001, vz + 0.21, { occ: false });
-      BX('ceramic', -0.31, 0.8, vz - 0.192, -0.292, vt - 0.001, vz + 0.192, { occ: false }); BX('ceramic', 0.292, 0.8, vz - 0.192, 0.31, vt - 0.001, vz + 0.192, { occ: false });
-      CY('chrome', 0, vt - 0.109, vz, 0.022, 0.022, 0.004, { seg: 12, free: true });
-      CY('chrome', 0, 0.8, 0.045, 0.022, 0.026, 0.03, { seg: 12 });                                // tall tap behind it
-      TU('chrome', [[0, 0.82, 0.045], [0, 1.07, 0.045], [0, 1.11, 0.085], [0, 1.09, 0.155], [0, 1.05, 0.165]], 0.011, { seg: 8, n: 24 });
-      B('chrome', 0.05, 0.83, 0.045, 0.07, 0.012, 0.016, { ry: 0.5 });
-      BX('blackMetal', -0.36, 1.15, 0, 0.36, 1.97, 0.012, { occ: false });                           // mirror frame and light bar
-      BX('lampCool', -0.27, 2.0, 0.01, 0.27, 2.028, 0.045);
-      CY('ceramic', -0.3, 0.8, 0.43, 0.03, 0.035, 0.1, { seg: 12 }); CY('chrome', -0.3, 0.9, 0.43, 0.012, 0.012, 0.03, { seg: 8 });   // soap pump
-      colRect(-0.4, 0, 0.4, 0.54);
-      pMirror({ kind: 'rect', w: 0.7, h: 0.8, p: [0, 1.56, 0.0135], n: [0, 0, 1] }, p.zone);
-      pLamp(0, 1.97, 0.15, 0.28, COOL, 1, { glow: 0.5 });
-    });
-  },
-  towelLadder(p) {                                                  // native: on an east wall at (x, z), facing west
-    pAt(p, () => {
-      const xl = -0.032;
-      for (const z of [-0.23, 0.23]) BAR('chrome', [xl, 0.78, z], [xl, 1.58, z], 0.011, { seg: 8 });
-      for (let i = 0; i < 7; i++) BAR('chrome', [xl, 0.84 + i * 0.115, -0.23], [xl, 0.84 + i * 0.115, 0.23], 0.008, { seg: 6 });
-      RB('towel', xl - 0.016, 1.06, 0, 0.036, 0.46, 0.36, 0.014, { occ: false });
-    });
-  },
-  rug(p) {                                                          // flat rectangle on the floor: mat, rect, h (0.012), round (corner radius)
-    const [x0, z0, x1, z1] = p.rect, h = p.h || 0.012;
-    if (p.round) RB(p.mat, (x0 + x1) / 2, 0, (z0 + z1) / 2, x1 - x0, h, z1 - z0, p.round, { occ: false, cell: 0.2 });
-    else BX(p.mat, x0, 0, z0, x1, h, z1, { occ: false, cell: 0.2 });
-  },
-  roundRug(p) {                                                     // round plaid rug, radius 0.78
-    LA('rugPlaid', p.x, 0, p.z, [[0.78, 0], [0.78, 0.01], [0.66, 0.01], [0.54, 0.01], [0.42, 0.01], [0.3, 0.01], [0.18, 0.01], [0.08, 0.01], [0.001, 0.01]], { seg: 48, uv: 'box', uvScale: 1 / 1.56, uo: 0.5, vo: 0.5 });
-  },
-
-  // -- hall --
-  closet(p) {   // sliding-door wardrobe filling a recess: rect, face 'w'|'e'|'n'|'s' (the side its doors are on)
-    const [x0, z0, x1, z1] = p.rect, f = p.face || 'w', L = f === 'w' || f === 'e' ? z1 - z0 : x1 - x0, N = { occ: false, cell: 0.35 }, h = L / 2;
-    const fb = (mat, u0, u1, y0, y1, t0, t1, o) => {               // u along the doors from the north or west end, t in from the front
-      if (f === 'w') BX(mat, x0 + t0, y0, z0 + u0, x0 + t1, y1, z0 + u1, o);
-      else if (f === 'e') BX(mat, x1 - t1, y0, z0 + u0, x1 - t0, y1, z0 + u1, o);
-      else if (f === 'n') BX(mat, x0 + u0, y0, z0 + t0, x0 + u1, y1, z0 + t1, o);
-      else BX(mat, x0 + u0, y0, z1 - t1, x0 + u1, y1, z1 - t0, o);
-    };
-    fb('walnut', 0, h + 0.01, 0.04, H - 0.04, 0.01, 0.04, N); fb('walnut', h - 0.01, L, 0.04, H - 0.04, 0.04, 0.07, N);
-    fb('alu', 0, L, 0, 0.04, 0, 0.08, { occ: false }); fb('alu', 0, L, H - 0.04, H, 0, 0.08, { occ: false });
-    fb('blackMetal', h - 0.075, h - 0.057, 0.9, 1.3, 0.002, 0.01, { occ: false }); fb('blackMetal', h + 0.06, h + 0.078, 0.9, 1.3, 0.032, 0.04, { occ: false });
-    occBox(x0, 0, z0, x1, H, z1, albOf('walnut'));
-    into(CAPS, () => quadGrid('capWood', x0, H + 0.001, z0, [0, 0, 1], [1, 0, 0], [0, z1 - z0], [0, x1 - x0], (x, y, z) => [x * 2, z]));
-    COL.push({ k: 0, x0, z0, x1, z1 });
-  },
-  entryPhone(p) {                                                   // native: on a west wall at (x, z), facing east
-    pAt(p, () => { BX('switch', 0, 1.36, -0.05, 0.022, 1.56, 0.05, { occ: false }); BX('plastic', 0.022, 1.44, -0.03, 0.024, 1.54, 0.03, { occ: false }); });
-  },
-  mirrorShelf(p) {   // floating shelf under a round mirror, with a vase of twigs and a bowl. native: on a west wall, facing east. zone
-    pAt(p, () => {
-      BX('oak', 0, 0.905, -0.4, 0.18, 0.945, 0.4, { cell: 0.25 });
-      colRect(0, -0.4, 0.12, 0.4);
-      CY('blackMetal', 0, 1.494, 0, 0.3, 0.3, 0.012, { seg: 40, rz: PI / 2 });
-      pMirror({ kind: 'disc', r: 0.285, p: [0.0075, 1.5, 0], n: [1, 0, 0] }, p.zone);
-      LA('potWhite', 0.09, 0.945, -0.25, [[0.001, 0], [0.04, 0], [0.06, 0.08], [0.035, 0.17], [0.03, 0.2]], { seg: 14 });
-      const R = rng(7);
-      for (let i = 0; i < 6; i++) BAR('stem', [0.09, 1.13, -0.25], [0.09 + (R() - 0.3) * 0.16, 1.42 + R() * 0.16, -0.25 + (R() - 0.5) * 0.24], 0.003, { seg: 4 });
-      LA('ochre', 0.09, 0.945, 0.21, [[0.001, 0], [0.07, 0], [0.085, 0.02], [0.078, 0.02], [0.066, 0.006], [0.001, 0.006]], { seg: 16 });
-    });
-  },
-  coatBench(p) {   // shoe bench 0.95 long with coat hooks above. native: on a west wall at (x, z), facing east
-    pAt(p, () => {
-      BX('greyWood', 0, 0.42, -0.475, 0.36, 0.46, 0.475, { cell: 0.25 });
-      BX('greyWood', 0.03, 0, -0.445, 0.33, 0.42, -0.405, { occ: false }); BX('greyWood', 0.03, 0, 0.405, 0.33, 0.42, 0.445, { occ: false });
-      BX('greyWood', 0.03, 0.12, -0.405, 0.33, 0.15, 0.405, { occ: false });
-      colRect(0, -0.475, 0.36, 0.475);
-      BX('oak', 0, 1.7, -0.425, 0.02, 1.78, 0.425, { occ: false });
-      for (const z of [-0.325, -0.075, 0.175]) BAR('blackMetal', [0.02, 1.74, z], [0.09, 1.77, z], 0.007, { seg: 6 });
-      RB('beige', 0.065, 1.05, -0.075, 0.07, 0.62, 0.36, 0.03, { occ: false });
-      for (const [x, z, r] of [[0.14, -0.225, 0.1], [0.24, -0.155, -0.1]]) { RB('shoe', x, 0.15, z, 0.27, 0.07, 0.1, 0.03, { ry: r, occ: false }); RB('rubber', x, 0.15, z, 0.274, 0.02, 0.104, 0.008, { ry: r, occ: false }); }
-      RB('cushion', 0.18, 0.46, 0.225, 0.3, 0.05, 0.38, 0.02, { occ: false });
-    });
-  },
-
-  // -- kitchen --
-  counter(p) {   // a straight run of base units with a slate top: rect (worktop, back to front), face 'n'|'s'|'e'|'w' (where the fronts look),
-    //             sink, hob: distances along the run from its west or north end; sinkW (0.6); oven under the hob unless false;
-    //             hood over the hob unless false; fronts [from, to] along the run; splash unless false
-    const [x0, z0, x1, z1] = p.rect, f = p.face || 's', alongX = f === 's' || f === 'n', L = alongX ? x1 - x0 : z1 - z0, D = alongX ? z1 - z0 : x1 - x0;
-    const top = 0.9, w0 = 0.87, N = { occ: false };
-    const wx = (u, t) => (alongX ? x0 + u : f === 'e' ? x0 + t : x1 - t), wz = (u, t) => (!alongX ? z0 + u : f === 's' ? z0 + t : z1 - t);
-    const cb = (mat, u0, u1, y0, y1, t0, t1, o) => BXS(mat, wx(u0, t0), y0, wz(u0, t0), wx(u1, t1), y1, wz(u1, t1), o);
-    const pt = (u, t) => [wx(u, t), wz(u, t)];
-    cb('cabinet', 0, L, 0.1, w0, 0, D - 0.04);
-    cb('plinth', 0, L, 0, 0.1, 0.05, D - 0.09, N);
-    const hob = p.hob, oven = hob !== undefined && p.oven !== false;
-    const [fa, fz] = p.fronts || [0, L], parts = oven ? [[fa, Math.max(fa, hob - 0.29)], [Math.min(fz, hob + 0.29), fz]] : [[fa, fz]];
-    for (const [s, e] of parts) {                                   // doors of at most 0.6 m with bar handles
-      if (e - s < 0.1) continue;
-      const n = Math.ceil((e - s) / 0.6 - 1e-6), w = (e - s) / n;
-      for (let i = 0; i < n; i++) {
-        const a = s + i * w + 0.002, b = s + (i + 1) * w - 0.002, m = (a + b) / 2;
-        cb('cabinet', a, b, 0.105, w0 - 0.005, D - 0.04, D - 0.022, { occ: false, cell: 0.3 });
-        cb('steel', m - 0.12, m + 0.12, w0 - 0.06, w0 - 0.048, D - 0.022, D - 0.002, N);
-      }
-    }
-    if (oven) {
-      cb('plastic', hob - 0.29, hob + 0.29, 0.105, w0 - 0.005, D - 0.04, D - 0.018, N);
-      cb('screen', hob - 0.25, hob + 0.25, 0.33, 0.76, D - 0.018, D - 0.014);
-      cb('steel', hob - 0.25, hob + 0.25, 0.79, 0.804, D - 0.004, D + 0.01, N);
-      for (const k of [-0.15, 0.15]) { const [x, z] = pt(hob + k, D - 0.012); CY('steel', x, 0.832, z, 0.014, 0.014, 0.012, alongX ? { seg: 10, rx: PI / 2 } : { seg: 10, rz: PI / 2 }); }
-    }
-    if (p.sink !== undefined) {                                     // worktop with the sink let into it
-      const su = p.sink, sw = p.sinkW || 0.6, [sx, sz] = pt(su, D / 2), [tx, tz] = pt(su, 0.07);
-      if (su - sw / 2 > 0.005) cb('stone', 0, su - sw / 2, w0, top, 0, D, { cell: 0.2 });
-      if (L - su - sw / 2 > 0.005) cb('stone', su + sw / 2, L, w0, top, 0, D, { cell: 0.2 });
-      const hw = alongX ? 0.44 : 0.4, hd = alongX ? 0.4 : 0.44;
-      rim('stone', sx, top, sz, alongX ? sw : D, alongX ? D : sw, hw, hd, 0.04);
-      basin('steel', sx, top, sz, hw, hd, 0.17, 0.04, { free: true });
-      rim('steel', sx, top + 0.001, sz, hw + 0.028, hd + 0.028, hw, hd, 0.04);
-      CY('chrome', sx, top - 0.169, sz, 0.03, 0.03, 0.004, { seg: 12, free: true });
-      CY('chrome', tx, top, tz, 0.024, 0.027, 0.04, { seg: 12 });                                    // mixer tap
-      const sp = (t, y) => { const [x, z] = pt(su, t); return [x, y, z]; };
-      TU('chrome', [sp(0.07, top + 0.03), sp(0.07, 1.2), sp(0.13, 1.28), sp(0.23, 1.26), sp(0.25, 1.2)], 0.012, { seg: 8, n: 26 });
-      const [lx, lz] = pt(su + 0.05, 0.07);
-      B('chrome', lx, top + 0.03, lz, 0.08, 0.012, 0.016, { ry: alongX ? 0.4 : 0.4 + PI / 2 });
-    } else cb('stone', 0, L, w0, top, 0, D, { cell: 0.2 });
-    if (p.splash !== false) cb('splash', 0, L, top, 1.5, 0, 0.006, { occ: false, cell: 0.25 });
-    if (hob !== undefined) {                                        // hob with pan supports, and the hood above it
-      const [hx, hz] = pt(hob, D / 2);
-      cb('plastic', hob - 0.2725, hob + 0.2725, top, top + 0.006, D / 2 - 0.23, D / 2 + 0.23, N);
-      put('hob', new T.PlaneGeometry(0.46, 0.545, 3, 3), xf(hx, top + 0.0068, hz, alongX ? PI / 2 : 0, -PI / 2), { uv: 'keep' });
-      for (const [u, v] of [[78, 70], [182, 74], [76, 186], [182, 186]]) {
-        const a = (u / 256 - 0.5) * 0.46, b = (v / 256 - 0.5) * 0.545, x = hx + (alongX ? b : a), z = hz + (alongX ? -a : b);
-        CY('plastic', x, top + 0.007, z, 0.03, 0.036, 0.012, { seg: 12 });
-        BAR('blackMetal', [x - 0.075, top + 0.026, z], [x + 0.075, top + 0.026, z], 0.004, { seg: 4 }); BAR('blackMetal', [x, top + 0.026, z - 0.075], [x, top + 0.026, z + 0.075], 0.004, { seg: 4 });
-      }
-      if (p.hood !== false) into(CEIL, () => { cb('steel', hob - 0.3, hob + 0.3, 1.62, 1.68, 0, 0.53); cb('steel', hob - 0.1, hob + 0.1, 1.68, H, 0, 0.23, { cell: 0.4 }); });
-    }
-    COL.push({ k: 0, x0, z0, x1, z1 });
-  },
-  fridge(p) {   // fridge-freezer w x d x h (0.66 x 0.6 x 1.9). native: back to a north wall at (x, z), facing south
-    const w = p.w || 0.66, d = p.d || 0.6, h = p.h || 1.9, hw = w / 2, N = { occ: false };
-    pAt(p, () => {
-      BX('fridge', -hw, 0.02, 0.02, hw, h, 0.02 + d, { cell: 0.4 });
-      BX('fridge', -hw + 0.004, 0.72, 0.02 + d, hw - 0.004, h - 0.004, 0.042 + d, { occ: false, cell: 0.4 }); BX('fridge', -hw + 0.004, 0.03, 0.02 + d, hw - 0.004, 0.705, 0.042 + d, N);
-      BX('steel', -hw + 0.04, 0.95, 0.042 + d, -hw + 0.062, 1.6, 0.07 + d, N); BX('steel', -hw + 0.04, 0.3, 0.042 + d, -hw + 0.062, 0.62, 0.07 + d, N);
-      BX('plinth', -hw + 0.02, 0, 0.07, hw - 0.02, 0.02, d, N);
-      colRect(-hw - 0.01, 0, hw + 0.01, d + 0.07);
-    });
-  },
-  washer(p) {                                                       // washing machine 0.6 wide. native: back to a north wall, facing south
-    pAt(p, () => {
-      BX('fridge', -0.3, 0.02, 0.02, 0.3, 0.85, 0.54, { cell: 0.3 });
-      BX('plastic', -0.28, 0.72, 0.54, 0.28, 0.83, 0.544, { occ: false });
-      CY('steel', 0, 0.43, 0.548, 0.19, 0.19, 0.02, { seg: 28, rx: PI / 2 });
-      CY('screen', 0, 0.43, 0.556, 0.15, 0.15, 0.008, { seg: 28, rx: PI / 2 });
-      colRect(-0.31, 0, 0.31, 0.56);
-    });
-  },
-  kitchenShelf(p) {   // oak wall shelf of length w (0.8) with storage jars, bowls and a small plant. native: on a north wall, facing south
-    const w = p.w || 0.8, a = -0.375 * w, b = -0.2 * w, c = 0.1 * w, d = 0.375 * w;
-    pAt(p, () => {
-      BX('oak', -w / 2, 1.58, 0.006, w / 2, 1.61, 0.2, { cell: 0.2 });
-      CY('ceramic', a, 1.61, 0.1, 0.05, 0.045, 0.13, { seg: 14 }); CY('oak', a, 1.74, 0.1, 0.052, 0.052, 0.018, { seg: 14 });
-      CY('teal', b, 1.61, 0.1, 0.045, 0.04, 0.1, { seg: 14 }); CY('oak', b, 1.71, 0.1, 0.047, 0.047, 0.016, { seg: 14 });
-      for (let i = 0; i < 3; i++) LA('ceramic', c, 1.61 + i * 0.022, 0.1, [[0.001, 0], [0.04, 0], [0.075, 0.045], [0.07, 0.045], [0.038, 0.008], [0.001, 0.008]], { seg: 14 });
-      plantSpiky(d, 0.1, { seed: 31, n: 16, len: 0.2, wid: 0.018, potR: 0.045, potH: 0.08, mats: ['leafA', 'leafB'], y: 1.61 });
-    });
-  },
-  fruitBowl(p) {                                                    // y: the worktop
-    place(p.x, p.y || 0.9, p.z, 0, () => {
-      LA('ochre', 0, 0, 0, [[0.001, 0], [0.07, 0], [0.15, 0.07], [0.142, 0.07], [0.066, 0.01], [0.001, 0.01]], { seg: 20 });
-      for (const [x, z, m] of [[0.04, 0.02, 'yellow'], [-0.05, 0.03, 'yellow'], [0, -0.055, 'yellow'], [0.01, 0.01, 'leafC'], [-0.03, -0.02, 'yellow']]) SP(m, x, 0.045 + (m === 'leafC' ? 0.045 : 0), z, 0.034, { sy: 0.9 });
-    });
-  },
-  jars(p) {                                                         // four storage jars in a row southwards from (x, z), on the worktop
-    pAt(p, () => { for (let i = 0; i < 4; i++) { const z = i * 0.13, m = i % 2 ? 'teal' : 'ceramic', h = 0.12 + (i % 2) * 0.03; CY(m, 0, 0.9, z, 0.048, 0.044, h, { seg: 14 }); CY('oak', 0, 0.9 + h, z, 0.05, 0.05, 0.016, { seg: 14 }); } });
-  },
-  teaRail(p) {                                                      // rail with a tea towel on a cabinet front. native: front faces south, (x, z) on it
-    pAt(p, () => {
-      BX('steel', -0.205, 0.8, 0, 0.205, 0.812, 0.024, { occ: false });
-      RB('stripe', -0.045, 0.5, 0.03, 0.2, 0.318, 0.012, 0.005, { occ: false }); RB('stripe', -0.045, 0.62, 0.008, 0.2, 0.196, 0.008, 0.003, { occ: false });
-    });
-  },
-
-  // -- dining --
-  diningSet(p) {   // oak table w x d (1.48 x 0.745) laid for a meal, two chairs on each long side; ends 'w', 'e', 'we' or '': chairs at the ends
-    //                (with a plate each unless endPlates is false). native: long side along X
-    const w = p.w || 1.48, d = p.d || 0.745, ty = 0.75, hw = w / 2, hd = d / 2, ends = p.ends === undefined ? 'w' : p.ends;
-    pAt(p, () => {
-      RB('oakStave', 0, ty - 0.04, 0, w, 0.04, d, 0.008, { cell: 0.2 });
-      for (const x of [-hw + 0.21, hw - 0.21]) {
-        BAR('blackMetal', [x, 0, -hd + 0.08], [x, ty - 0.04, -hd + 0.17], 0.016, { seg: 8 }); BAR('blackMetal', [x, 0, hd - 0.08], [x, ty - 0.04, hd - 0.17], 0.016, { seg: 8 });
-        BX('blackMetal', x - 0.016, ty - 0.07, -hd + 0.15, x + 0.016, ty - 0.04, hd - 0.15, { occ: false });
-      }
-      colRect(-hw, -hd, hw, hd);
-      BX('linen', -0.25, ty, -hd - 0.042, -0.01, ty + 0.003, hd + 0.042, { occ: false, cell: 0.2 });   // runner
-      BX('linen', -0.25, ty - 0.14, -hd - 0.045, -0.01, ty + 0.003, -hd - 0.042, { occ: false }); BX('linen', -0.25, ty - 0.14, hd + 0.042, -0.01, ty + 0.003, hd + 0.045, { occ: false });
-      const plates = [[-hw + 0.29, -0.2], [hw - 0.27, -0.2], [-hw + 0.29, 0.2], [hw - 0.27, 0.2]];
-      if (p.endPlates !== false) { if (ends.includes('w')) plates.push([-hw + 0.13, 0]); if (ends.includes('e')) plates.push([hw - 0.13, 0]); }
-      for (const [x, z] of plates) LA('ceramic', x, ty, z, [[0.001, 0], [0.07, 0], [0.125, 0.016], [0.118, 0.016], [0.07, 0.006], [0.001, 0.006]], { seg: 20 });
-      place(-0.15, ty + 0.003, 0, 0, () => {                         // jug of yellow flowers
-        LA('teal', 0, 0, 0, [[0.001, 0], [0.045, 0], [0.066, 0.07], [0.05, 0.15], [0.03, 0.19], [0.036, 0.2]], { seg: 16 });
-        const R = rng(19);
-        for (let i = 0; i < 9; i++) {
-          const a = R() * TAU, r = 0.03 + R() * 0.09, h = 0.3 + R() * 0.12, x = Math.cos(a) * r, z = Math.sin(a) * r;
-          BAR('leafA', [0, 0.18, 0], [x, h, z], 0.0025, { seg: 4 });
-          SP('yellow', x, h, z, 0.024, { seg: 8, hseg: 6, sy: 0.7 });
-        }
-      });
-      LA('bottle', 0.05, ty, -0.09, [[0.001, 0], [0.037, 0], [0.037, 0.19], [0.014, 0.25], [0.014, 0.31], [0.001, 0.31]], { seg: 14 });
-      wineGlass(0.17, ty, -0.05, true); wineGlass(0.21, ty, 0.11, true); wineGlass(0.32, ty, 0.06, false);
-      diningChair(-0.17 * w, -hd - 0.16, 0.06); diningChair(0.27 * w, -hd - 0.17, -0.05);
-      diningChair(-0.21 * w, hd + 0.195, PI + 0.08); diningChair(0.32 * w, hd + 0.185, PI - 0.04);
-      if (ends.includes('w')) diningChair(-hw - 0.29, -0.0175, PI / 2 + 0.05);
-      if (ends.includes('e')) diningChair(hw + 0.29, 0.02, -PI / 2 - 0.04);
-    });
-  },
-
-  // -- living room --
-  media(p) {   // low oak console 1.7 long with a television, books and a vase. native: back to a west wall at (x, z), facing east
-    pAt(p, () => pFrom(3.46, 5.81, () => {
-      BX('blackMetal', 3.53, 0, 5.02, 3.81, 0.1, 6.6, { occ: false });
-      RB('oak', 3.67, 0.1, 5.81, 0.34, 0.36, 1.7, 0.008, { cell: 0.25 });
-      for (const z of [5.385, 5.81, 6.235]) BX('plinth', 3.838, 0.12, z - 0.002, 3.8415, 0.44, z + 0.002, { occ: false });
-      colRect(3.46, 4.96, 3.84, 6.66);
-      BX('plastic', 3.6, 0.46, 5.7, 3.74, 0.474, 5.96, { occ: false }); BX('plastic', 3.655, 0.474, 5.8, 3.675, 0.57, 5.86, { occ: false });
-      BX('plastic', 3.648, 0.55, 5.215, 3.682, 1.26, 6.445, { cell: 0.3 });
-      BX('screen', 3.682, 0.562, 5.227, 3.685, 1.248, 6.433);
-      books(3.67, 0.46, 6.37, 0.2, BOOKS);
-      LA('pot', 3.66, 0.46, 5.09, [[0.001, 0], [0.05, 0], [0.075, 0.1], [0.05, 0.22], [0.028, 0.27], [0.034, 0.29]], { seg: 16 });
-      const R = rng(13);
-      for (let i = 0; i < 5; i++) BAR('stem', [3.66, 0.74, 5.09], [3.66 + (R() - 0.3) * 0.2, 1.05 + R() * 0.25, 5.09 + (R() - 0.5) * 0.3], 0.003, { seg: 4 });
-      LA('ochre', 3.7, 0.46, 6.58, [[0.001, 0], [0.035, 0], [0.06, 0.04], [0.054, 0.04], [0.032, 0.007], [0.001, 0.007]], { seg: 14 });
-    }));
-  },
-  coffeeTable(p) {                                                  // round, dark wood, 0.82 across
-    pAt(p, () => {
-      CY('darkWood', 0, 0.37, 0, 0.41, 0.41, 0.035, { seg: 44, occ: false });
-      occLocal(xf(0, 0.3875, 0), 0.56, 0.035, 0.56, albOf('darkWood'));
-      for (let i = 0; i < 3; i++) { const a = i * TAU / 3 + 0.5; BAR('blackMetal', [Math.cos(a) * 0.34, 0, Math.sin(a) * 0.34], [Math.cos(a) * 0.2, 0.37, Math.sin(a) * 0.2], 0.012, { seg: 8 }); }
-      CY('blackMetal', 0, 0.17, 0, 0.27, 0.27, 0.008, { seg: 30 });
-      B('plastic', -0.04, 0.405, -0.03, 0.25, 0.008, 0.18, { ry: 0.55 }); B('screen', -0.04, 0.4131, -0.03, 0.23, 0.001, 0.16, { ry: 0.55 });
-      CY('yellow', 0.16, 0.405, 0.1, 0.034, 0.034, 0.07, { seg: 12 });
-      LA('ceramic', 0.02, 0.405, 0.2, [[0.001, 0], [0.03, 0], [0.04, 0.07], [0.035, 0.07], [0.027, 0.008], [0.001, 0.008]], { seg: 12 });
-      colCircle(0, 0, 0.41);
-    });
-  },
-  sofa(p) {   // three-seat sofa 2.52 x 1.11. native: the sitter faces south (back to the north)
-    pAt(p, () => {
-      for (const [x, z] of [[-1.16, -0.45], [1.16, -0.45], [-1.16, 0.45], [1.16, 0.45]]) CY('blackMetal', x, 0, z, 0.022, 0.018, 0.08, { seg: 8 });
-      RB('sofa', 0, 0.08, 0, 2.52, 0.3, 1.11, 0.04, { cell: 0.3 });
-      RB('sofa', 0, 0.38, -0.43, 2.52, 0.42, 0.25, 0.06, { cell: 0.3 });
-      for (const s of [-1, 1]) RB('sofa', s * 1.13, 0.38, 0.07, 0.26, 0.24, 0.97, 0.06, { cell: 0.3 });
-      for (const x of [-0.67, 0, 0.67]) { RB('sofa', x, 0.38, 0.12, 0.655, 0.14, 0.8, 0.05, { cell: 0.25 }); RB('sofa', x, 0.5, -0.25, 0.64, 0.36, 0.16, 0.07, { rx: -0.16, occ: false }); }
-      RB('cushion', 0.4, 0.55, -0.12, 0.42, 0.4, 0.13, 0.06, { rx: -0.42, ry: 0.15, occ: false });
-      RB('cushion', 0.84, 0.53, 0.12, 0.44, 0.13, 0.42, 0.06, { ry: 0.5, rz: 0.1, occ: false });
-      RB('cushion', -0.86, 0.55, -0.1, 0.48, 0.4, 0.14, 0.06, { rx: -0.5, ry: -0.3, occ: false });
-      RB('beige', 0.36, 0.515, 0.2, 0.5, 0.022, 0.72, 0.01, { occ: false, cell: 0.2 });           // throw spilling over the seat front
-      RB('beige', 0.36, 0.03, 0.572, 0.5, 0.5, 0.022, 0.01, { occ: false, cell: 0.2 }); RB('beige', 0.34, 0, 0.66, 0.52, 0.03, 0.2, 0.012, { occ: false, ry: 0.1 });
-      B('paper', -0.3, 0.522, 0.2, 0.2, 0.006, 0.27, { ry: 0.3, rz: 0.03 }); B('paper', -0.11, 0.522, 0.26, 0.2, 0.006, 0.27, { ry: 0.3, rz: -0.03 });   // open magazine
-      colRect(-1.26, -0.555, 1.26, 0.555);
-    });
-  },
-  cornerSofa(p) {   // corner sofa 2.78 long with a chaise at its east end. native: the sitter faces south
-    pAt(p, () => {
-      for (const [x, z] of [[-1.26, -0.45], [1.26, -0.45], [-1.26, 0.45], [1.26, 1.25]]) CY('blackMetal', x, 0, z, 0.022, 0.018, 0.08, { seg: 8 });
-      RB('sofa', 0, 0.08, 0, 2.78, 0.3, 1.11, 0.04, { cell: 0.3 });
-      RB('sofa', 0.98, 0.08, 0.95, 0.82, 0.3, 0.8, 0.04, { cell: 0.3 });
-      RB('sofa', 0, 0.38, -0.43, 2.78, 0.42, 0.25, 0.06, { cell: 0.3 });
-      RB('sofa', -1.26, 0.38, 0.07, 0.26, 0.24, 0.97, 0.06, { cell: 0.3 });
-      RB('sofa', 1.26, 0.38, 0.47, 0.26, 0.24, 1.77, 0.06, { cell: 0.3 });
-      for (const x of [-0.85, -0.18]) { RB('sofa', x, 0.38, 0.12, 0.655, 0.14, 0.8, 0.05, { cell: 0.25 }); RB('sofa', x, 0.5, -0.25, 0.64, 0.36, 0.16, 0.07, { rx: -0.16, occ: false }); }
-      RB('sofa', 0.73, 0.38, 0.52, 0.71, 0.14, 1.6, 0.05, { cell: 0.25 }); RB('sofa', 0.73, 0.5, -0.25, 0.7, 0.36, 0.16, 0.07, { rx: -0.16, occ: false });
-      RB('cushion', 0.3, 0.55, -0.12, 0.42, 0.4, 0.13, 0.06, { rx: -0.42, ry: 0.15, occ: false });
-      RB('cushion', 0.95, 0.55, -0.1, 0.44, 0.4, 0.13, 0.06, { rx: -0.42, ry: -0.2, occ: false });
-      RB('cushion', -0.98, 0.55, -0.1, 0.48, 0.4, 0.14, 0.06, { rx: -0.5, ry: -0.3, occ: false });
-      RB('beige', 0.73, 0.525, 0.9, 0.6, 0.022, 0.9, 0.01, { occ: false, cell: 0.2 });
-      B('paper', -0.4, 0.522, 0.2, 0.2, 0.006, 0.27, { ry: 0.3, rz: 0.03 }); B('paper', -0.21, 0.522, 0.26, 0.2, 0.006, 0.27, { ry: 0.3, rz: -0.03 });
-      colRect(-1.39, -0.555, 1.39, 0.555); colRect(0.57, 0.5, 1.39, 1.35);
-    });
-  },
-  // Two-and-a-half-seat shell sofa 1.72 x 0.82, 0.80 high: channel-tufted back that curves round into low flared arms,
-  // one long seat cushion, tapered pale-wood legs (after a JYSK photo). native: the sitter faces south.
-  // Values: `mat` the fabric (default terracotta), `legs` the leg material (default oak).
-  shellSofa(p) {
-    const F = p.mat || 'terracotta', L = p.legs || 'oak';
-    const LEG = 0.18, SEAT = 0.40, BACK = 0.80, ARM = 0.62;   // heights
-    const AX = 0.745, BZ = -0.32, RC = 0.27, FRONT = 0.33;    // flute centreline: arm x, back z, corner radius, arm front z
-    pAt(p, () => {
-      for (const [x, z] of [[-0.7, -0.29], [0.7, -0.29], [-0.7, 0.29], [0.7, 0.29]]) CY(L, x, 0, z, 0.024, 0.015, LEG, { seg: 12, rx: -z * 0.25, rz: x * 0.07 });   // splayed outwards
-      RB(F, 0, LEG, 0.02, 1.68, SEAT - LEG + 0.02, 0.78, 0.07, { cell: 0.3 });           // base under the cushion
-      RB(F, 0, SEAT - 0.01, 0.07, 2 * (AX - 0.07), 0.13, 0.66, 0.06, { cell: 0.25, occ: false }); // seat cushion
-      // The U-shaped shell: walk its centreline (back, two quarter turns, arms) and stand a rounded flute every ~0.12 m.
-      // An outer skin follows the same line so the outside reads smooth; the grooves only show inside.
-      const cx = AX - RC, cz = BZ + RC, arc = PI / 2 * RC, side = FRONT - cz;
-      const half = cx + arc + side, n = Math.round(half / 0.12), step = half / n;
-      const at = (s) => {                                   // s from the middle of the back outwards (x >= 0 side)
-        if (s <= cx) return { x: s, z: BZ, a: 0, top: BACK };
-        if (s <= cx + arc) { const t = (s - cx) / RC; return { x: cx + Math.sin(t) * RC, z: cz - Math.cos(t) * RC, a: t, top: lerp(BACK, ARM + 0.05, sstep(0, PI / 2, t)) }; }
-        const u = (s - cx - arc) / side;
-        return { x: AX, z: cz + u * side, a: PI / 2, top: ARM + 0.05 - u * 0.05 };
-      };
-      for (const sx of [-1, 1]) {
-        for (let i = 0; i < n; i++) {
-          const q = at((i + 0.5) * step), ry = -sx * q.a;
-          const ox = Math.sin(q.a) * 0.035, oz = -Math.cos(q.a) * 0.035;   // outwards from the seat
-          const lean = q.a < 0.01 ? -0.1 : 0;
-          RB(F, sx * q.x, SEAT - 0.04, q.z, step * 1.0, q.top - SEAT - 0.01, 0.16, 0.042, { ry, rx: lean, cell: 0.2, occ: false });
-          // smooth outer skin; its top tucks under the rolled edge below
-          RB(F, sx * (q.x + ox), LEG + 0.02, q.z + oz, step * 1.3, q.top - LEG - 0.08, 0.12, 0.03, { ry, rx: lean, cell: 0.2, occ: false });
-        }
-        // flared arm front: a round end cap where the shell meets the seat front
-        RB(F, sx * AX, LEG + 0.02, FRONT + 0.02, 0.19, ARM - LEG - 0.03, 0.1, 0.05, { cell: 0.2, occ: false });
-      }
-      // one rolled top edge over the whole U, so the channels run into a smooth roll as on the real sofa
-      const RR = 0.08, roll = [];
-      for (let i = 0; i <= 40; i++) {
-        const s = (i / 40) * 2 * half - half, q = at(Math.abs(s)), sg = s < 0 ? -1 : 1;
-        roll.push([sg * q.x, q.top - RR, q.z - (q.a < 0.01 ? 0.02 : 0)]);
-      }
-      TU(F, roll, RR, { n: 120, seg: 14, occ: false });
-      for (const sx of [-1, 1]) { const q = at(half); SP(F, sx * q.x, q.top - RR, q.z, RR, { occ: false }); }
-      // light stand-ins for the bake: back, arms, base (kept inside the visible shapes)
-      pOcc(-0.6, SEAT + 0.04, -0.4, 0.6, BACK - 0.08, -0.29, albOf(F));
-      for (const sx of [-1, 1]) pOcc(sx * 0.745 - 0.055, LEG + 0.05, -0.05, sx * 0.745 + 0.055, ARM - 0.06, 0.3, albOf(F));
-      colRect(-0.86, -0.41, 0.86, 0.41);
-    });
-  },
-  // Modular three-seat sofa with a loose ottoman, 2.81 wide, 0.82 deep (1.43 with the ottoman), 0.85 high
-  // (gorgia.ge MLM-110293, BM-00227947): slim track arms, a box cushion under each flanged pillow-top seat, three big
-  // flanged back pillows leaning on a low frame, two throw pillows, near-black block legs. native: the sitter faces south.
-  // Values: `mat` the fabric (default chenille), `legs` (default ebony), `ottoman` 1 in front of the east seat
-  // (default), -1 the west seat, 0 none; `pillows` 0 leaves the two throw pillows out.
-  modularSofa(p) {
-    const F = p.mat || 'chenille', L = p.legs || 'ebony', side = p.ottoman === undefined ? 1 : p.ottoman;
-    const W = 2.81, D = 0.82, ARM = 0.15, ARMH = 0.62, LEG = 0.11, BASE = 0.30, BOX = 0.375;
-    const SW = (W - 2 * ARM) / 3, z0 = -D / 2, z1 = D / 2, OD = 0.6;
-    const legs = (xa, xb, za, zb) => { for (const x of [xa + 0.06, xb - 0.06]) for (const z of [za + 0.06, zb - 0.06]) B(L, x, 0, z, 0.055, LEG + 0.01, 0.055); };
-    // one seat: frame, box cushion with a sewn welt, pillow top whose flange laps over the front
-    const seat = (cx, za, zb, seed) => {
-      RB(F, cx, LEG, (za + zb) / 2, SW - 0.008, BASE - LEG, zb - za, 0.03, { cell: 0.2 });
-      RB(F, cx, BASE, (za + 0.12 + zb) / 2, SW - 0.012, BOX - BASE, zb - za - 0.12, 0.03, { cell: 0.2 });
-      RB(F, cx, BOX - 0.006, (za + 0.12 + zb) / 2, SW - 0.004, 0.009, zb - za - 0.112, 0.004, { occ: false });
-      PIL(F, cx, BOX + 0.035, (za + 0.1 + zb) / 2 - 0.005, SW - 0.045, 0.125, zb - za - 0.15, { lower: 0.32, flange: 0.024, seed, lump: 0.035 });
-    };
-    pAt(p, () => {
-      const mods = [[-W / 2, -W / 2 + ARM + SW], [-SW / 2, SW / 2], [W / 2 - ARM - SW, W / 2]];
-      mods.forEach(([xa, xb]) => legs(xa, xb, z0, z1));
-      for (const sx of [-1, 1]) RB(F, sx * (W / 2 - ARM / 2), LEG, 0, ARM, ARMH - LEG, D, 0.05, { k: 3, cell: 0.15 });
-      for (let k = 0; k < 3; k++) {
-        const cx = (k - 1) * SW;
-        // low back frame per module; the back pillows hide it from the front
-        RB(F, cx, BASE, z0 + 0.08, SW - 0.008, 0.40, 0.16, 0.04, { cell: 0.2 });
-        seat(cx, z0, z1, 11 + k);
-        PIL(F, cx, 0.625, -0.175, SW - 0.03, 0.2, 0.42, { rx: PI / 2 - 0.2, lower: 0.42, flange: 0.024, seed: 21 + k, lump: 0.06 });
-      }
-      if (p.pillows !== 0) {
-        PIL(F, -1.13, 0.64, -0.1, 0.44, 0.15, 0.44, { rx: PI / 2 - 0.42, ry: 0.55, rz: -0.18, flange: 0.02, seed: 31 });
-        PIL(F, 1.13, 0.64, -0.1, 0.44, 0.15, 0.44, { rx: PI / 2 - 0.42, ry: -0.55, rz: 0.18, flange: 0.02, seed: 32 });
-      }
-      colRect(-W / 2, z0, W / 2, z1);
-      if (side) {
-        const cx = side * SW, za = z1 + 0.01, zb = za + OD;
-        legs(cx - SW / 2, cx + SW / 2, za, zb);
-        RB(F, cx, LEG, (za + zb) / 2, SW - 0.008, BASE - LEG, OD, 0.03, { cell: 0.2 });
-        RB(F, cx, BASE, (za + zb) / 2, SW - 0.012, BOX - BASE, OD - 0.004, 0.03, { cell: 0.2 });
-        RB(F, cx, BOX - 0.006, (za + zb) / 2, SW - 0.004, 0.009, OD + 0.004, 0.004, { occ: false });
-        PIL(F, cx, BOX + 0.035, (za + zb) / 2, SW - 0.045, 0.125, OD - 0.04, { lower: 0.32, flange: 0.024, seed: 15, lump: 0.035 });
-        colRect(cx - SW / 2, za, cx + SW / 2, zb);
-      }
-    });
-  },
-  armchair(p) {                                                     // native: the sitter faces south
-    pAt(p, () => {
-      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) CY('darkWood', sx * 0.3, 0, sz * 0.3, 0.02, 0.016, 0.12, { seg: 8 });
-      RB('sofa', 0, 0.12, 0, 0.78, 0.26, 0.76, 0.04, { cell: 0.3 });
-      RB('sofa', 0, 0.38, -0.3, 0.78, 0.44, 0.16, 0.05, { cell: 0.3 });
-      for (const s of [-1, 1]) RB('sofa', s * 0.33, 0.38, 0.06, 0.12, 0.2, 0.62, 0.04, { cell: 0.3 });
-      RB('sofa', 0, 0.38, 0.06, 0.54, 0.1, 0.6, 0.04, { occ: false });
-      RB('cushion', 0, 0.5, -0.17, 0.4, 0.34, 0.12, 0.05, { rx: -0.35, occ: false });
-      colRect(-0.39, -0.38, 0.39, 0.38);
-    });
-  },
-  sideTable(p) {                                                    // tripod table with a wicker tray
-    pAt(p, () => {
-      CY('plastic', 0, 0.47, 0, 0.22, 0.22, 0.03, { seg: 30 });
-      for (let i = 0; i < 3; i++) { const a = i * TAU / 3 - PI / 2; BAR('oak', [Math.cos(a) * 0.27, 0, Math.sin(a) * 0.27], [Math.cos(a) * 0.1, 0.47, Math.sin(a) * 0.1], 0.013, { r2: 0.017, seg: 8 }); }
-      LA('wicker', 0, 0.5, 0, [[0.001, 0], [0.12, 0], [0.135, 0.03], [0.125, 0.03], [0.115, 0.008], [0.001, 0.008]], { seg: 20, uv: 'box' });
-      colCircle(0, 0, 0.22);
-    });
-  },
-  art(p) { art(p.mat, p.x, p.y, p.z, p.w, p.h, dg(p.r)); },          // framed print on a wall: mat (art1..art3), y its centre, w, h; native: faces south
-  curtain(p) { curtain(p.x0, p.x1, p.z, p.y0 === undefined ? 0.02 : p.y0, p.y1 === undefined ? 2.66 : p.y1); },   // runs along X only
-  curtainTrack(p) { into(CEIL, () => BX('trim', p.x0, 2.66, p.z - 0.03, p.x1, H, p.z + 0.03)); },
-
-  // -- bedrooms --
-  bed(p) { pAt(p, doubleBed); },                                    // double bed 2.1 x 1.98. native: head to the west
-  nightTable(p) {                                                   // drum table with a globe lamp
-    pAt(p, () => {
-      CY('darkWood', 0, 0, 0, 0.19, 0.19, 0.5, { seg: 28 });
-      CY('brass', 0, 0.5, 0, 0.055, 0.06, 0.012, { seg: 16 }); CY('brass', 0, 0.512, 0, 0.008, 0.008, 0.09, { seg: 8 });
-      SP('lampOn', 0, 0.68, 0, 0.085, { seg: 16, hseg: 12 });
-      colCircle(0, 0, 0.19);
-      pLamp(0.03, 0.72, 0, 0.42, WARM, 1, { glow: 0.75 });
-    });
-  },
-  wallTV(p) {   // flat television with a warm halo behind it. native: on an east wall at (x, z), facing west
-    pAt(p, () => pFrom(3.34, 6.05, () => {
-      BX('plastic', 3.305, 0.93, 5.495, 3.34, 1.57, 6.605, { cell: 0.3 });
-      BX('screen', 3.301, 0.942, 5.507, 3.305, 1.558, 6.593);
-      put('halo', new T.PlaneGeometry(2.1, 1.5), xf(3.3375, 1.25, 6.05, -PI / 2), { uv: 'keep' });
-      pLamp(3.2, 1.25, 6.05, 0.2, WARM, 1, { glow: 0 });
-    }));
-  },
-  crib(p) {                                                         // oval wicker crib 1.25 x 0.78, long side along X
-    pAt(p, () => {
-      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) BAR('oak', [sx * 0.5, 0, sz * 0.3], [sx * 0.36, 0.5, sz * 0.2], 0.014, { r2: 0.018, seg: 8 });
-      BAR('oak', [-0.43, 0.24, -0.25], [-0.43, 0.24, 0.25], 0.012, { seg: 6 }); BAR('oak', [0.43, 0.24, -0.25], [0.43, 0.24, 0.25], 0.012, { seg: 6 });
-      LA('wickerWhite', 0, 0.45, 0, [[0.001, 0], [0.5, 0], [0.6, 0.3], [0.625, 0.325], [0.585, 0.325], [0.5, 0.06], [0.001, 0.05]], { seg: 40, sz: 0.62 });
-      CY('linen', 0, 0.5, 0, 0.5, 0.5, 0.06, { seg: 30, sz: 0.62 });
-      RB('beige', 0.12, 0.555, 0, 0.5, 0.03, 0.46, 0.012, { occ: false });
-      SP('linen', -0.34, 0.6, 0, 1, { sx: 0.1, sy: 0.04, sz: 0.16, seg: 12, hseg: 8 });
-      occLocal(xf(0, 0.475, 0), 0.7, 0.05, 0.43, albOf('wickerWhite'));
-      colRect(-0.62, -0.39, 0.62, 0.39);
-    });
-  },
-  bench(p) {   // grey bench 1.16 long with a clock, cushion, basket and shoes. native: back to a south wall at (x, z), facing north
-    pAt(p, () => pFrom(1.99, 9.42, () => {
-      BX('greyWood', 1.41, 0.4, 9.05, 2.57, 0.45, 9.42, { cell: 0.25 });
-      BX('greyWood', 1.45, 0, 9.08, 1.5, 0.4, 9.4, { occ: false }); BX('greyWood', 2.48, 0, 9.08, 2.53, 0.4, 9.4, { occ: false });
-      BX('greyWood', 1.5, 0.12, 9.1, 2.48, 0.15, 9.38, { occ: false });
-      colRect(1.41, 9.05, 2.57, 9.42);
-      place(2.37, 0.45, 9.3, 0.25, () => {
-        CY('teal', 0, 0.045, 0, 0.075, 0.075, 0.06, { rx: PI / 2, seg: 24 });
-        CY('paper', 0, 0.0735, -0.031, 0.062, 0.062, 0.003, { rx: PI / 2, seg: 24 });
-        B('charcoal', 0.012, 0.074, -0.034, 0.03, 0.005, 0.002, { rz: 0.5 }); B('charcoal', 0, 0.075, -0.034, 0.005, 0.045, 0.002);
-      });
-      RB('beige', 1.72, 0.45, 9.24, 0.4, 0.06, 0.28, 0.02, { occ: false }); RB('cushion', 1.72, 0.51, 9.24, 0.38, 0.05, 0.26, 0.02, { occ: false });
-      LA('wicker', 1.95, 0.15, 9.24, [[0.001, 0], [0.13, 0], [0.16, 0.2], [0.15, 0.2], [0.125, 0.01], [0.001, 0.01]], { seg: 20, uv: 'box' });
-      for (const [x, z, r] of [[1.78, 8.83, 0.2], [1.92, 8.86, -0.15]]) { RB('shoe', x, 0, z, 0.1, 0.07, 0.27, 0.03, { ry: r, occ: false }); RB('rubber', x, 0, z, 0.104, 0.02, 0.274, 0.008, { ry: r, occ: false }); }
-    }));
-  },
-  radiator(p) {                                                     // panel radiator 0.8 long. native: on a south wall at (x, z), facing north
-    pAt(p, () => pFrom(0.95, 9.42, () => {
-      BX('trim', 0.55, 0.16, 9.335, 1.35, 0.7, 9.4, { occ: false, cell: 0.3 });
-      for (let i = 0; i < 16; i++) BX('trim', 0.556 + i * 0.05, 0.17, 9.325, 0.59 + i * 0.05, 0.69, 9.336, { occ: false });
-      for (const x of [0.6, 1.3]) BAR('chrome', [x, 0, 9.37], [x, 0.16, 9.37], 0.008, { seg: 6 });
-    }));
-  },
-  wardrobe(p) {                                                     // free-standing walnut wardrobe 2.4 high: rect, face 'n'|'s'|'e'|'w'
-    const [x0, z0, x1, z1] = p.rect, f = p.face || 's', N = { occ: false }, ht = 2.4;
-    BX('walnut', x0, 0.04, z0, x1, ht, z1, { cell: 0.35 });
-    BX('plinth', x0 + 0.02, 0, z0 + 0.02, x1 - 0.02, 0.04, z1 - 0.02, N);
-    if (f === 'e' || f === 'w') {
-      const zm = (z0 + z1) / 2, xa = f === 'e' ? x1 : x0 - 0.004, xh = f === 'e' ? x1 : x0 - 0.01;
-      BX('plinth', xa, 0.06, zm - 0.003, xa + 0.004, ht - 0.02, zm + 0.003, N);
-      BX('blackMetal', xh, 0.9, zm - 0.12, xh + 0.01, 1.3, zm - 0.1, N); BX('blackMetal', xh, 0.9, zm + 0.1, xh + 0.01, 1.3, zm + 0.12, N);
-    } else {
-      const xm = (x0 + x1) / 2, za = f === 's' ? z1 : z0 - 0.004, zh = f === 's' ? z1 : z0 - 0.01;
-      BX('plinth', xm - 0.003, 0.06, za, xm + 0.003, ht - 0.02, za + 0.004, N);
-      BX('blackMetal', xm - 0.12, 0.9, zh, xm - 0.1, 1.3, zh + 0.01, N); BX('blackMetal', xm + 0.1, 0.9, zh, xm + 0.12, 1.3, zh + 0.01, N);
-    }
-    COL.push({ k: 0, x0, z0, x1, z1 });
-  },
-  lowShelf(p) {                                                     // oak cabinet 0.9 high: rect; books and a bowl on top
-    const [x0, z0, x1, z1] = p.rect, alongZ = z1 - z0 >= x1 - x0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-    BX('oak', x0, 0, z0, x1, 0.9, z1, { cell: 0.25 });
-    COL.push({ k: 0, x0, z0, x1, z1 });
-    books(alongZ ? cx : x0 + 0.23, 0.9, alongZ ? z0 + 0.23 : cz, 0.3, BOOKS);
-    LA('ochre', alongZ ? cx : x1 - 0.3, 0.9, alongZ ? z1 - 0.3 : cz, [[0.001, 0], [0.035, 0], [0.06, 0.04], [0.054, 0.04], [0.032, 0.007], [0.001, 0.007]], { seg: 14 });
-  },
-
-  // -- balcony and anything else --
-  rattanChair(p) {                                                  // native: the sitter faces south
-    pAt(p, () => {
-      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) BAR('wicker', [sx * 0.28, 0, sz * 0.28], [sx * 0.25, 0.35, sz * 0.25], 0.016, { seg: 8, uv: 'box' });
-      RB('wicker', 0, 0.33, 0, 0.6, 0.05, 0.58, 0.02);
-      put('wicker', bendGeo(roundedBoxGeo(1.25, 0.36, 0.035, 0.015, 2, 0.08), 0.33), xf(0, 0.56, -0.33, PI));
-      RB('skyblue', 0, 0.38, 0.02, 0.5, 0.09, 0.5, 0.04, { occ: false });
-      colCircle(0, 0, 0.36);
-    });
-  },
-  bistroTable(p) {                                                  // round table 0.6 across with a cup
-    pAt(p, () => {
-      CY('plastic', 0, 0.7, 0, 0.3, 0.3, 0.025, { seg: 32 });
-      CY('blackMetal', 0, 0.02, 0, 0.025, 0.025, 0.68, { seg: 10 }); CY('blackMetal', 0, 0, 0, 0.2, 0.22, 0.02, { seg: 24 });
-      LA('ceramic', 0.08, 0.725, 0.05, [[0.001, 0], [0.04, 0], [0.045, 0.09], [0.04, 0.09], [0.035, 0.008], [0.001, 0.008]], { seg: 14 });
-      colCircle(0, 0, 0.3);
-    });
-  },
-  block(p) {                                                        // solid low block (a balcony pier, say): rect, h (1.05), mat (facade)
-    const [x0, z0, x1, z1] = p.rect;
-    BX(p.mat || 'facade', x0, 0, z0, x1, p.h || 1.05, z1, { cell: 0.25 });
-    COL.push({ k: 0, x0, z0, x1, z1 });
-  },
-  box(p) {                                                          // plain box: mat, b [x0, y0, z0, x1, y1, z1], occ, col (true: walk collider)
-    const b = p.b;
-    BX(p.mat, b[0], b[1], b[2], b[3], b[4], b[5], { occ: p.occ, cell: p.cell });
-    if (p.col) COL.push({ k: 0, x0: b[0], z0: b[2], x1: b[3], z1: b[5] });
-  },
-  shower(p) {   // walk-in shower: low tray w x d (0.9 x 1.0), mixer and rain head on the back wall, glass screen on side
-    //            glass 'w' | 'e' | '' (default 'w'). native: back to a north wall at (x, z), the tray running south
-    const w = p.w || 0.9, d = p.d || 1.0, g = p.glass === undefined ? 'w' : p.glass;
-    pAt(p, () => {
-      B('ceramic', 0, 0, d / 2, w, 0.035, d, { cell: 0.3, occ: false });
-      put('chrome', new T.CircleGeometry(0.05, 18), xf(0, 0.036, d / 2, 0, -PI / 2), { uv: 'keep' });
-      BX('chrome', -0.09, 0.98, 0, 0.09, 1.1, 0.04);
-      BAR('chrome', [0, 1.1, 0.02], [0, 2.12, 0.02], 0.011, { seg: 8 });
-      TU('chrome', [[0, 2.1, 0.02], [0, 2.16, 0.06], [0, 2.16, 0.3]], 0.011, { seg: 8 });
-      CY('chrome', 0, 2.125, 0.3, 0.115, 0.115, 0.012, { seg: 24 });
-      if (g) {
-        const sx = g === 'e' ? 1 : -1, gx = sx * (w / 2 - 0.01);
-        BXS('glass', gx - 0.004, 0.035, 0, gx + 0.004, 2.0, d - 0.04, { occ: false });
-        BXS('chrome', gx - 0.012, 0.035, d - 0.06, gx + 0.012, 2.0, d - 0.035, { occ: false });
-        colRect(gx - 0.03, 0, gx + 0.03, d - 0.03);
-      }
-    });
-  },
-  acUnit(p) {   // outdoor air-conditioning unit 0.8 x 0.3 x 0.56 on two feet. native: back to a north wall at (x, z), its fan facing south
-    pAt(p, () => {
-      BX('blackMetal', -0.36, 0, 0.03, -0.3, 0.06, 0.29); BX('blackMetal', 0.3, 0, 0.03, 0.36, 0.06, 0.29);
-      RB('doorWhite', 0, 0.06, 0.16, 0.8, 0.56, 0.28, 0.015);
-      put('charcoal', new T.CircleGeometry(0.2, 28), xf(-0.11, 0.34, 0.301), { uv: 'keep' });
-      for (const r of [0.08, 0.14, 0.2]) put('blackMetal', new T.RingGeometry(r - 0.008, r, 28), xf(-0.11, 0.34, 0.303), { uv: 'keep' });
-      BX('charcoal', 0.2, 0.12, 0.29, 0.34, 0.56, 0.302);
-      colRect(-0.42, 0, 0.42, 0.32);
-    });
-  },
-};
-
-// Every piece of furniture gets batches of its own, so the Furniture panel can move, turn or take away one piece while
-// the page runs, and the "Empty" button can hide them all. Built-in ceiling lights (FIXED) stay with the shell.
-// A piece's lamps, looking glasses and colliders go into LAMPS, MIRRORS and COL as usual, marked furn and listed on its
-// record; its light stand-ins are kept on the record only, so OCC holds the shell's.
-const FIXED = { downlight: 1, ceilingLamp: 1 };
-const PIECE_RECS = [];
-// Builds piece p into rec (a new record if none): rec.map, rec.ceil, rec.caps hold its batches.
-function buildPiece(p, rec) {
-  const fn = PIECES[p.t];
-  if (!fn) throw new Error('no piece called "' + p.t + '" (flats/FORMAT.md lists them)');
-  rec = Object.assign(rec || {}, { p, map: new Map(), ceil: new Map(), caps: new Map() });
-  const l0 = LAMPS.length, m0 = MIRRORS.length, c0 = COL.length, o0 = OCC.box.length, a0 = OCC.alb.length, save = TARGET, saveM = CUR;
-  OCC_SETS.add(rec.map);
-  REMAP.set(CEIL, rec.ceil); REMAP.set(CAPS, rec.caps); TARGET = rec.map; CUR = new T.Matrix4();
-  try { fn(p); } finally { TARGET = save; CUR = saveM; REMAP.clear(); OCC_SETS.delete(rec.map); }
-  rec.lamps = LAMPS.slice(l0); rec.mirrors = MIRRORS.slice(m0); rec.cols = COL.slice(c0);
-  rec.occBox = OCC.box.splice(o0); rec.occAlb = OCC.alb.splice(a0);
-  for (const a of [rec.lamps, rec.mirrors, rec.cols]) for (const q of a) q.furn = true;
-  return rec;
-}
-function buildFurniture() {
-  (FLAT.furniture || []).forEach((p, i) => {
-    if (!PIECES[p.t]) throw new Error('furniture[' + i + ']: no piece called "' + p.t + '" (flats/FORMAT.md lists them)');
-    if (FIXED[p.t] || p.fixed) PIECES[p.t](p);
-    else PIECE_RECS.push(buildPiece(p));
+// outdoor air-conditioning unit 0.8 x 0.3 x 0.56 on two feet. native: back to a north wall at (x, z), its fan facing south
+piece('acUnit', { name: 'Air conditioner', add: 32 }, function (p) {
+  pAt(p, () => {
+    BX('blackMetal', -0.36, 0, 0.03, -0.3, 0.06, 0.29); BX('blackMetal', 0.3, 0, 0.03, 0.36, 0.06, 0.29);
+    RB('doorWhite', 0, 0.06, 0.16, 0.8, 0.56, 0.28, 0.015);
+    put('charcoal', new T.CircleGeometry(0.2, 28), xf(-0.11, 0.34, 0.301), { uv: 'keep' });
+    for (const r of [0.08, 0.14, 0.2]) put('blackMetal', new T.RingGeometry(r - 0.008, r, 28), xf(-0.11, 0.34, 0.303), { uv: 'keep' });
+    BX('charcoal', 0.2, 0.12, 0.29, 0.34, 0.56, 0.302);
+    colRect(-0.42, 0, 0.42, 0.32);
   });
-}
+});
 
+// native: the sitter faces south
+piece('armchair', { name: 'Armchair', add: 5 }, function (p) {
+  pAt(p, () => {
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) CY('darkWood', sx * 0.3, 0, sz * 0.3, 0.02, 0.016, 0.12, { seg: 8 });
+    RB('sofa', 0, 0.12, 0, 0.78, 0.26, 0.76, 0.04, { cell: 0.3 });
+    RB('sofa', 0, 0.38, -0.3, 0.78, 0.44, 0.16, 0.05, { cell: 0.3 });
+    for (const s of [-1, 1]) RB('sofa', s * 0.33, 0.38, 0.06, 0.12, 0.2, 0.62, 0.04, { cell: 0.3 });
+    RB('sofa', 0, 0.38, 0.06, 0.54, 0.1, 0.6, 0.04, { occ: false });
+    RB('cushion', 0, 0.5, -0.17, 0.4, 0.34, 0.12, 0.05, { rx: -0.35, occ: false });
+    colRect(-0.39, -0.38, 0.39, 0.38);
+  });
+});
+
+// framed print on a wall: mat (art1..art3), y its centre, w, h; native: faces south
+piece('art', { name: 'Picture', add: 29, values: { mat: 'art1', y: 1.5, w: 0.7, h: 0.5 } }, function (p) { art(p.mat, p.x, p.y, p.z, p.w, p.h, dg(p.r)); });
+
+// built-in bath, rect with its long side along Z. mixer 'w'|'e': the tap wall; head 'n'|'s': the shower end;
+piece('bath', { name: 'Bath' }, function (p) {
+  //           rain (overhead shower on the head wall), screen (glass at the head end): true unless false; hole [w, d]
+  if (p.along === 'x') {                                           // long side along X: build it along Z, turned a quarter
+    const [a0, b0, a1, b1] = p.rect, cx = (a0 + a1) / 2, cz = (b0 + b1) / 2, hw = (a1 - a0) / 2, hd = (b1 - b0) / 2;
+    const nc = COL.length, no = OCC.box.length;                    // turned frame: world (x, z) = (cx + lz, cz - lx)
+    place(cx, 0, cz, Math.PI / 2, () => PIECES.bath({ ...p, along: undefined, rect: [-hd, -hw, hd, hw] }));
+    for (let i = nc; i < COL.length; i++) {
+      const c = COL[i]; if (c.k !== 0) continue;
+      [c.x0, c.z0, c.x1, c.z1] = [cx + c.z0, cz - c.x1, cx + c.z1, cz - c.x0];
+    }
+    for (let i = no; i < OCC.box.length; i += 6) {
+      const [x0, y0, z0, x1, y1, z1] = OCC.box.slice(i, i + 6);
+      OCC.box.splice(i, 6, cx + z0, y0, cz - x1, cx + z1, y1, cz - x0);
+    }
+    return;
+  }
+  const [x0, z0, x1, z1] = p.rect, top = 0.58, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0, cer = albOf('ceramic');
+  const hole = p.hole || [w - 0.26, d - 0.275], sx = p.mixer === 'e' ? -1 : 1, sz = p.head === 's' ? -1 : 1, N = { occ: false, cell: 0.3 };
+  const X = (u) => (sx > 0 ? x0 + u : x1 - u), Z = (v) => (sz > 0 ? z0 + v : z1 - v);    // u out from the tap wall, v from the shower end
+  rim('ceramic', cx, top, cz, w, d, hole[0], hole[1], 0.2);
+  basin('ceramic', cx, top, cz, hole[0], hole[1], 0.44, 0.2);
+  BXS('ceramic', X(w - 0.018), 0, z0, X(w), top - 0.001, z1, N);
+  BXS('ceramic', X(0), 0, Z(d - 0.018), X(w - 0.018), top - 0.001, Z(d), N);
+  occBox(x1 - 0.13, 0, z0, x1, top, z1, cer); occBox(x0, 0, z0, x0 + 0.13, top, z1, cer);
+  occBox(x0, 0, z1 - 0.137, x1, top, z1, cer); occBox(x0, 0, z0, x1, top, z0 + 0.137, cer); occBox(x0, 0, z0, x1, 0.14, z1, cer);
+  COL.push({ k: 0, x0, z0, x1, z1 });
+  CY('chrome', cx, top - 0.438, Z(d / 2 + 0.55), 0.028, 0.028, 0.004, { seg: 14 });
+  const m = d / 2;                                                // wall mixer halfway along, with hose and hand shower
+  BXS('chrome', X(0), 0.74, Z(m - 0.09), X(0.045), 0.795, Z(m + 0.09));
+  TU('chrome', [[X(0.03), 0.765, Z(m)], [X(0.13), 0.765, Z(m)], [X(0.17), 0.735, Z(m)]], 0.013, { seg: 8 });
+  CY('chrome', X(0.022), 0.8, Z(m - 0.06), 0.014, 0.014, 0.03, { seg: 10 }); CY('chrome', X(0.022), 0.8, Z(m + 0.06), 0.014, 0.014, 0.03, { seg: 10 });
+  TU('chrome', [[X(0.03), 0.75, Z(m + 0.08)], [X(0.09), 0.66, Z(m + 0.16)], [X(0.06), 0.72, Z(m + 0.3)], [X(0.022), 0.96, Z(m + 0.36)], [X(0.022), 1.12, Z(m + 0.36)]], 0.007, { seg: 6, n: 30 });
+  CY('chrome', X(0.022), 1.1, Z(m + 0.36), 0.013, 0.013, 0.16, { seg: 8, rx: 0.5 * sz });
+  CY('chrome', X(0.035), 1.245, Z(m + 0.41), 0.04, 0.04, 0.014, { seg: 14, rz: -1.1 * sx });
+  if (p.rain !== false) {
+    BAR('chrome', [cx, 1.0, Z(0.012)], [cx, 2.12, Z(0.012)], 0.011, { seg: 8 });
+    TU('chrome', [[cx, 2.1, Z(0.012)], [cx, 2.16, Z(0.055)], [cx, 2.16, Z(0.315)]], 0.011, { seg: 8 });
+    CY('chrome', cx, 2.125, Z(0.315), 0.115, 0.115, 0.012, { seg: 24 });
+  }
+  if (p.screen !== false) { BXS('glass', X(w - 0.016), top, Z(0.015), X(w - 0.008), 2.0, Z(0.855)); BXS('chrome', X(w - 0.022), top, Z(0), X(w - 0.002), 2.0, Z(0.017)); }
+  CY('teal', X(0.18), top, Z(0.085), 0.032, 0.032, 0.17, { seg: 12 }); CY('paper', X(0.26), top, Z(0.075), 0.028, 0.028, 0.14, { seg: 12 }); CY('ochre', X(0.33), top, Z(0.09), 0.026, 0.03, 0.11, { seg: 12 });
+});
+
+// double bed 2.1 x 1.98. native: head to the west
+piece('bed', { name: 'Double bed', add: 15 }, function (p) { pAt(p, doubleBed); });
+
+// grey bench 1.16 long with a clock, cushion, basket and shoes. native: back to a south wall at (x, z), facing north
+piece('bench', { name: 'Hall bench', add: 20 }, function (p) {
+  pAt(p, () => pFrom(1.99, 9.42, () => {
+    BX('greyWood', 1.41, 0.4, 9.05, 2.57, 0.45, 9.42, { cell: 0.25 });
+    BX('greyWood', 1.45, 0, 9.08, 1.5, 0.4, 9.4, { occ: false }); BX('greyWood', 2.48, 0, 9.08, 2.53, 0.4, 9.4, { occ: false });
+    BX('greyWood', 1.5, 0.12, 9.1, 2.48, 0.15, 9.38, { occ: false });
+    colRect(1.41, 9.05, 2.57, 9.42);
+    place(2.37, 0.45, 9.3, 0.25, () => {
+      CY('teal', 0, 0.045, 0, 0.075, 0.075, 0.06, { rx: PI / 2, seg: 24 });
+      CY('paper', 0, 0.0735, -0.031, 0.062, 0.062, 0.003, { rx: PI / 2, seg: 24 });
+      B('charcoal', 0.012, 0.074, -0.034, 0.03, 0.005, 0.002, { rz: 0.5 }); B('charcoal', 0, 0.075, -0.034, 0.005, 0.045, 0.002);
+    });
+    RB('beige', 1.72, 0.45, 9.24, 0.4, 0.06, 0.28, 0.02, { occ: false }); RB('cushion', 1.72, 0.51, 9.24, 0.38, 0.05, 0.26, 0.02, { occ: false });
+    LA('wicker', 1.95, 0.15, 9.24, [[0.001, 0], [0.13, 0], [0.16, 0.2], [0.15, 0.2], [0.125, 0.01], [0.001, 0.01]], { seg: 20, uv: 'box' });
+    for (const [x, z, r] of [[1.78, 8.83, 0.2], [1.92, 8.86, -0.15]]) { RB('shoe', x, 0, z, 0.1, 0.07, 0.27, 0.03, { ry: r, occ: false }); RB('rubber', x, 0, z, 0.104, 0.02, 0.274, 0.008, { ry: r, occ: false }); }
+  }));
+});
+
+// round table 0.6 across with a cup
+piece('bistroTable', { name: 'Bistro table', add: 13 }, function (p) {
+  pAt(p, () => {
+    CY('plastic', 0, 0.7, 0, 0.3, 0.3, 0.025, { seg: 32 });
+    CY('blackMetal', 0, 0.02, 0, 0.025, 0.025, 0.68, { seg: 10 }); CY('blackMetal', 0, 0, 0, 0.2, 0.22, 0.02, { seg: 24 });
+    LA('ceramic', 0.08, 0.725, 0.05, [[0.001, 0], [0.04, 0], [0.045, 0.09], [0.04, 0.09], [0.035, 0.008], [0.001, 0.008]], { seg: 14 });
+    colCircle(0, 0, 0.3);
+  });
+});
+
+// solid low block (a balcony pier, say): rect, h (1.05), mat (facade)
+piece('block', { name: 'Block' }, function (p) {
+  const [x0, z0, x1, z1] = p.rect;
+  BX(p.mat || 'facade', x0, 0, z0, x1, p.h || 1.05, z1, { cell: 0.25 });
+  COL.push({ k: 0, x0, z0, x1, z1 });
+});
+
+// plain box: mat, b [x0, y0, z0, x1, y1, z1], occ, col (true: walk collider)
+piece('box', { name: 'Box' }, function (p) {
+  const b = p.b;
+  BX(p.mat, b[0], b[1], b[2], b[3], b[4], b[5], { occ: p.occ, cell: p.cell });
+  if (p.col) COL.push({ k: 0, x0: b[0], z0: b[2], x1: b[3], z1: b[5] });
+});
+
+// flush dish of radius s
+piece('ceilingLamp', {}, function (p) { ceilingLamp(p.x, p.z, p.s || 0.16, p.I || 1, colOf(p.col), p.ch || 1); });
+
+// L-shaped corner sofa 2.55 wide, 0.92 deep (1.60 at the chaise), 0.86 high (gorgia.ge BM-00157269): teal velvet,
+// channel-tufted seat and back, flared rolled arms, a lower rolled back over the chaise, two throw pillows, chrome legs.
+// native: the sitter faces south, the chaise is at the west end. Values: `mat` the fabric (default teal),
+// `chaise` 1 west (default) / -1 east, `pillows` 0 leaves the throw pillows out.
+piece('channelCornerSofa', { name: 'Corner sofa (channel)', add: 33 }, function (p) {
+  const F = p.mat || 'teal', s = p.chaise === -1 ? -1 : 1;
+  const W = 2.55, D = 0.92, ARM = 0.15, LEG = 0.09, BASE = 0.3, SEAT = 0.46, CH = 0.95, CD = 1.6;
+  const z0 = -D / 2, z1 = D / 2, zc = z0 + CD, BK = 0.2;
+  const xL = -W / 2 + ARM, xS = xL + CH, xR = W / 2 - ARM;           // chaise from xL to xS, main seat from xS to xR
+  const X = (x) => s * x;                                             // mirror for an east chaise
+  const channels = (xa, xb, w) => { const n = Math.max(1, Math.round((xb - xa) / w)), cw = (xb - xa) / n; return Array.from({ length: n }, (_, i) => xa + cw * (i + 0.5)).map((c) => [c, cw]); };
+  pAt(p, () => {
+    for (const [x, z] of [[-W / 2 + 0.08, z0 + 0.08], [W / 2 - 0.08, z0 + 0.08], [W / 2 - 0.08, z1 - 0.08], [xS - 0.08, zc - 0.08], [xL + 0.08, zc - 0.08]])
+      CY('chrome', X(x), 0, z, 0.022, 0.016, LEG, { seg: 10, occ: false });
+    // plinths
+    RB(F, X((xS + W / 2) / 2), LEG, 0, W / 2 - xS, BASE - LEG, D, 0.03, { cell: 0.25 });
+    RB(F, X((-W / 2 + xS) / 2), LEG, (z0 + zc) / 2, xS + W / 2, BASE - LEG, CD, 0.03, { cell: 0.25 });
+    // main seat: channels running front to back, piping along the front
+    for (const [c, cw] of channels(xS, xR, 0.15)) PIL(F, X(c), (BASE + SEAT) / 2, (z0 + BK + z1) / 2, cw - 0.006, SEAT - BASE, z1 - z0 - BK, { lower: 0.4, flange: 0.012, seed: 40 + Math.round(c * 50), lump: 0.02 });
+    RB(F, X((xS + xR) / 2), BASE + 0.02, z1 - 0.012, xR - xS, 0.025, 0.03, 0.012, { occ: false });
+    // chaise block: one box cushion with a quilted top
+    RB(F, X((xL + xS) / 2), BASE - 0.01, (z0 + BK + zc) / 2, CH - 0.01, SEAT - BASE - 0.03, zc - z0 - BK - 0.01, 0.04, { cell: 0.2 });
+    PIL(F, X((xL + xS) / 2), SEAT - 0.02, (z0 + BK + zc) / 2, CH - 0.04, 0.06, zc - z0 - BK - 0.04, { flange: 0.015, seed: 7, lump: 0.015 });
+    // backs: tall channelled back behind the main seat, lower rolled back over the chaise
+    RB(F, X((xS + xR) / 2), BASE, z0 + 0.07, xR - xS, 0.5, 0.14, 0.04, { cell: 0.25 });
+    for (const [c, cw] of channels(xS, xR, 0.13)) RB(F, X(c), BASE + 0.02, z0 + 0.15, cw - 0.01, 0.84 - BASE, 0.12, 0.05, { cell: 0.2, occ: false });
+    RB(F, X((xL + xS) / 2), BASE, z0 + 0.08, CH, 0.3, 0.16, 0.04, { cell: 0.25 });
+    for (const [c, cw] of channels(xL, xS, 0.13)) CY(F, X(c), 0.6, z0 + 0.12, 0.085, 0.085, cw - 0.006, { rz: PI / 2, seg: 14 });
+    // flared rolled arms
+    for (const ax of [-W / 2 + ARM / 2, W / 2 - ARM / 2]) {
+      const zb = ax < 0 ? zc : z1, zm = (z0 + zb) / 2, ln = zb - z0;
+      RB(F, X(ax), LEG, zm, ARM, 0.5, ln, 0.04, { cell: 0.2 });
+      RB(F, X(ax + (ax < 0 ? -0.015 : 0.015)), 0.44, zm, ARM + 0.04, 0.2, ln + 0.01, 0.08, { cell: 0.2 });
+    }
+    // throw pillows, darker petrol shade is the same fabric
+    if (p.pillows !== 0) {
+      PIL(F, X(xS + 0.25), 0.62, z0 + 0.32, 0.44, 0.14, 0.44, { rx: PI / 2 - 0.4, ry: -0.35 * s, rz: 0.12, flange: 0.02, seed: 81 });
+      PIL(F, X(xR - 0.25), 0.62, z0 + 0.32, 0.44, 0.14, 0.44, { rx: PI / 2 - 0.4, ry: 0.4 * s, rz: -0.15, flange: 0.02, seed: 82 });
+    }
+    colRect(-W / 2, z0, W / 2, z1);
+    colRect(Math.min(X(-W / 2), X(xS)), z1, Math.max(X(-W / 2), X(xS)), zc);
+  });
+});
+
+// sliding-door wardrobe filling a recess: rect, face 'w'|'e'|'n'|'s' (the side its doors are on)
+piece('closet', { name: 'Built-in wardrobe' }, function (p) {
+  const [x0, z0, x1, z1] = p.rect, f = p.face || 'w', L = f === 'w' || f === 'e' ? z1 - z0 : x1 - x0, N = { occ: false, cell: 0.35 }, h = L / 2;
+  const fb = (mat, u0, u1, y0, y1, t0, t1, o) => {               // u along the doors from the north or west end, t in from the front
+    if (f === 'w') BX(mat, x0 + t0, y0, z0 + u0, x0 + t1, y1, z0 + u1, o);
+    else if (f === 'e') BX(mat, x1 - t1, y0, z0 + u0, x1 - t0, y1, z0 + u1, o);
+    else if (f === 'n') BX(mat, x0 + u0, y0, z0 + t0, x0 + u1, y1, z0 + t1, o);
+    else BX(mat, x0 + u0, y0, z1 - t1, x0 + u1, y1, z1 - t0, o);
+  };
+  fb('walnut', 0, h + 0.01, 0.04, H - 0.04, 0.01, 0.04, N); fb('walnut', h - 0.01, L, 0.04, H - 0.04, 0.04, 0.07, N);
+  fb('alu', 0, L, 0, 0.04, 0, 0.08, { occ: false }); fb('alu', 0, L, H - 0.04, H, 0, 0.08, { occ: false });
+  fb('blackMetal', h - 0.075, h - 0.057, 0.9, 1.3, 0.002, 0.01, { occ: false }); fb('blackMetal', h + 0.06, h + 0.078, 0.9, 1.3, 0.032, 0.04, { occ: false });
+  occBox(x0, 0, z0, x1, H, z1, albOf('walnut'));
+  into(CAPS, () => quadGrid('capWood', x0, H + 0.001, z0, [0, 0, 1], [1, 0, 0], [0, z1 - z0], [0, x1 - x0], (x, y, z) => [x * 2, z]));
+  COL.push({ k: 0, x0, z0, x1, z1 });
+});
+
+// shoe bench 0.95 long with coat hooks above. native: on a west wall at (x, z), facing east
+piece('coatBench', { name: 'Coat bench', add: 21 }, function (p) {
+  pAt(p, () => {
+    BX('greyWood', 0, 0.42, -0.475, 0.36, 0.46, 0.475, { cell: 0.25 });
+    BX('greyWood', 0.03, 0, -0.445, 0.33, 0.42, -0.405, { occ: false }); BX('greyWood', 0.03, 0, 0.405, 0.33, 0.42, 0.445, { occ: false });
+    BX('greyWood', 0.03, 0.12, -0.405, 0.33, 0.15, 0.405, { occ: false });
+    colRect(0, -0.475, 0.36, 0.475);
+    BX('oak', 0, 1.7, -0.425, 0.02, 1.78, 0.425, { occ: false });
+    for (const z of [-0.325, -0.075, 0.175]) BAR('blackMetal', [0.02, 1.74, z], [0.09, 1.77, z], 0.007, { seg: 6 });
+    RB('beige', 0.065, 1.05, -0.075, 0.07, 0.62, 0.36, 0.03, { occ: false });
+    for (const [x, z, r] of [[0.14, -0.225, 0.1], [0.24, -0.155, -0.1]]) { RB('shoe', x, 0.15, z, 0.27, 0.07, 0.1, 0.03, { ry: r, occ: false }); RB('rubber', x, 0.15, z, 0.274, 0.02, 0.104, 0.008, { ry: r, occ: false }); }
+    RB('cushion', 0.18, 0.46, 0.225, 0.3, 0.05, 0.38, 0.02, { occ: false });
+  });
+});
+
+// round, dark wood, 0.82 across
+piece('coffeeTable', { name: 'Coffee table', add: 6 }, function (p) {
+  pAt(p, () => {
+    CY('darkWood', 0, 0.37, 0, 0.41, 0.41, 0.035, { seg: 44, occ: false });
+    occLocal(xf(0, 0.3875, 0), 0.56, 0.035, 0.56, albOf('darkWood'));
+    for (let i = 0; i < 3; i++) { const a = i * TAU / 3 + 0.5; BAR('blackMetal', [Math.cos(a) * 0.34, 0, Math.sin(a) * 0.34], [Math.cos(a) * 0.2, 0.37, Math.sin(a) * 0.2], 0.012, { seg: 8 }); }
+    CY('blackMetal', 0, 0.17, 0, 0.27, 0.27, 0.008, { seg: 30 });
+    B('plastic', -0.04, 0.405, -0.03, 0.25, 0.008, 0.18, { ry: 0.55 }); B('screen', -0.04, 0.4131, -0.03, 0.23, 0.001, 0.16, { ry: 0.55 });
+    CY('yellow', 0.16, 0.405, 0.1, 0.034, 0.034, 0.07, { seg: 12 });
+    LA('ceramic', 0.02, 0.405, 0.2, [[0.001, 0], [0.03, 0], [0.04, 0.07], [0.035, 0.07], [0.027, 0.008], [0.001, 0.008]], { seg: 12 });
+    colCircle(0, 0, 0.41);
+  });
+});
+
+// corner sofa 2.78 long with a chaise at its east end. native: the sitter faces south
+piece('cornerSofa', { name: 'Corner sofa', add: 2 }, function (p) {
+  pAt(p, () => {
+    for (const [x, z] of [[-1.26, -0.45], [1.26, -0.45], [-1.26, 0.45], [1.26, 1.25]]) CY('blackMetal', x, 0, z, 0.022, 0.018, 0.08, { seg: 8 });
+    RB('sofa', 0, 0.08, 0, 2.78, 0.3, 1.11, 0.04, { cell: 0.3 });
+    RB('sofa', 0.98, 0.08, 0.95, 0.82, 0.3, 0.8, 0.04, { cell: 0.3 });
+    RB('sofa', 0, 0.38, -0.43, 2.78, 0.42, 0.25, 0.06, { cell: 0.3 });
+    RB('sofa', -1.26, 0.38, 0.07, 0.26, 0.24, 0.97, 0.06, { cell: 0.3 });
+    RB('sofa', 1.26, 0.38, 0.47, 0.26, 0.24, 1.77, 0.06, { cell: 0.3 });
+    for (const x of [-0.85, -0.18]) { RB('sofa', x, 0.38, 0.12, 0.655, 0.14, 0.8, 0.05, { cell: 0.25 }); RB('sofa', x, 0.5, -0.25, 0.64, 0.36, 0.16, 0.07, { rx: -0.16, occ: false }); }
+    RB('sofa', 0.73, 0.38, 0.52, 0.71, 0.14, 1.6, 0.05, { cell: 0.25 }); RB('sofa', 0.73, 0.5, -0.25, 0.7, 0.36, 0.16, 0.07, { rx: -0.16, occ: false });
+    RB('cushion', 0.3, 0.55, -0.12, 0.42, 0.4, 0.13, 0.06, { rx: -0.42, ry: 0.15, occ: false });
+    RB('cushion', 0.95, 0.55, -0.1, 0.44, 0.4, 0.13, 0.06, { rx: -0.42, ry: -0.2, occ: false });
+    RB('cushion', -0.98, 0.55, -0.1, 0.48, 0.4, 0.14, 0.06, { rx: -0.5, ry: -0.3, occ: false });
+    RB('beige', 0.73, 0.525, 0.9, 0.6, 0.022, 0.9, 0.01, { occ: false, cell: 0.2 });
+    B('paper', -0.4, 0.522, 0.2, 0.2, 0.006, 0.27, { ry: 0.3, rz: 0.03 }); B('paper', -0.21, 0.522, 0.26, 0.2, 0.006, 0.27, { ry: 0.3, rz: -0.03 });
+    colRect(-1.39, -0.555, 1.39, 0.555); colRect(0.57, 0.5, 1.39, 1.35);
+  });
+});
+
+// a straight run of base units with a slate top: rect (worktop, back to front), face 'n'|'s'|'e'|'w' (where the fronts look),
+piece('counter', { name: 'Kitchen units' }, function (p) {
+  //             sink, hob: distances along the run from its west or north end; sinkW (0.6); oven under the hob unless false;
+  //             hood over the hob unless false; fronts [from, to] along the run; splash unless false
+  const [x0, z0, x1, z1] = p.rect, f = p.face || 's', alongX = f === 's' || f === 'n', L = alongX ? x1 - x0 : z1 - z0, D = alongX ? z1 - z0 : x1 - x0;
+  const top = 0.9, w0 = 0.87, N = { occ: false };
+  const wx = (u, t) => (alongX ? x0 + u : f === 'e' ? x0 + t : x1 - t), wz = (u, t) => (!alongX ? z0 + u : f === 's' ? z0 + t : z1 - t);
+  const cb = (mat, u0, u1, y0, y1, t0, t1, o) => BXS(mat, wx(u0, t0), y0, wz(u0, t0), wx(u1, t1), y1, wz(u1, t1), o);
+  const pt = (u, t) => [wx(u, t), wz(u, t)];
+  cb('cabinet', 0, L, 0.1, w0, 0, D - 0.04);
+  cb('plinth', 0, L, 0, 0.1, 0.05, D - 0.09, N);
+  const hob = p.hob, oven = hob !== undefined && p.oven !== false;
+  const [fa, fz] = p.fronts || [0, L], parts = oven ? [[fa, Math.max(fa, hob - 0.29)], [Math.min(fz, hob + 0.29), fz]] : [[fa, fz]];
+  for (const [s, e] of parts) {                                   // doors of at most 0.6 m with bar handles
+    if (e - s < 0.1) continue;
+    const n = Math.ceil((e - s) / 0.6 - 1e-6), w = (e - s) / n;
+    for (let i = 0; i < n; i++) {
+      const a = s + i * w + 0.002, b = s + (i + 1) * w - 0.002, m = (a + b) / 2;
+      cb('cabinet', a, b, 0.105, w0 - 0.005, D - 0.04, D - 0.022, { occ: false, cell: 0.3 });
+      cb('steel', m - 0.12, m + 0.12, w0 - 0.06, w0 - 0.048, D - 0.022, D - 0.002, N);
+    }
+  }
+  if (oven) {
+    cb('plastic', hob - 0.29, hob + 0.29, 0.105, w0 - 0.005, D - 0.04, D - 0.018, N);
+    cb('screen', hob - 0.25, hob + 0.25, 0.33, 0.76, D - 0.018, D - 0.014);
+    cb('steel', hob - 0.25, hob + 0.25, 0.79, 0.804, D - 0.004, D + 0.01, N);
+    for (const k of [-0.15, 0.15]) { const [x, z] = pt(hob + k, D - 0.012); CY('steel', x, 0.832, z, 0.014, 0.014, 0.012, alongX ? { seg: 10, rx: PI / 2 } : { seg: 10, rz: PI / 2 }); }
+  }
+  if (p.sink !== undefined) {                                     // worktop with the sink let into it
+    const su = p.sink, sw = p.sinkW || 0.6, [sx, sz] = pt(su, D / 2), [tx, tz] = pt(su, 0.07);
+    if (su - sw / 2 > 0.005) cb('stone', 0, su - sw / 2, w0, top, 0, D, { cell: 0.2 });
+    if (L - su - sw / 2 > 0.005) cb('stone', su + sw / 2, L, w0, top, 0, D, { cell: 0.2 });
+    const hw = alongX ? 0.44 : 0.4, hd = alongX ? 0.4 : 0.44;
+    rim('stone', sx, top, sz, alongX ? sw : D, alongX ? D : sw, hw, hd, 0.04);
+    basin('steel', sx, top, sz, hw, hd, 0.17, 0.04, { free: true });
+    rim('steel', sx, top + 0.001, sz, hw + 0.028, hd + 0.028, hw, hd, 0.04);
+    CY('chrome', sx, top - 0.169, sz, 0.03, 0.03, 0.004, { seg: 12, free: true });
+    CY('chrome', tx, top, tz, 0.024, 0.027, 0.04, { seg: 12 });                                    // mixer tap
+    const sp = (t, y) => { const [x, z] = pt(su, t); return [x, y, z]; };
+    TU('chrome', [sp(0.07, top + 0.03), sp(0.07, 1.2), sp(0.13, 1.28), sp(0.23, 1.26), sp(0.25, 1.2)], 0.012, { seg: 8, n: 26 });
+    const [lx, lz] = pt(su + 0.05, 0.07);
+    B('chrome', lx, top + 0.03, lz, 0.08, 0.012, 0.016, { ry: alongX ? 0.4 : 0.4 + PI / 2 });
+  } else cb('stone', 0, L, w0, top, 0, D, { cell: 0.2 });
+  if (p.splash !== false) cb('splash', 0, L, top, 1.5, 0, 0.006, { occ: false, cell: 0.25 });
+  if (hob !== undefined) {                                        // hob with pan supports, and the hood above it
+    const [hx, hz] = pt(hob, D / 2);
+    cb('plastic', hob - 0.2725, hob + 0.2725, top, top + 0.006, D / 2 - 0.23, D / 2 + 0.23, N);
+    put('hob', new T.PlaneGeometry(0.46, 0.545, 3, 3), xf(hx, top + 0.0068, hz, alongX ? PI / 2 : 0, -PI / 2), { uv: 'keep' });
+    for (const [u, v] of [[78, 70], [182, 74], [76, 186], [182, 186]]) {
+      const a = (u / 256 - 0.5) * 0.46, b = (v / 256 - 0.5) * 0.545, x = hx + (alongX ? b : a), z = hz + (alongX ? -a : b);
+      CY('plastic', x, top + 0.007, z, 0.03, 0.036, 0.012, { seg: 12 });
+      BAR('blackMetal', [x - 0.075, top + 0.026, z], [x + 0.075, top + 0.026, z], 0.004, { seg: 4 }); BAR('blackMetal', [x, top + 0.026, z - 0.075], [x, top + 0.026, z + 0.075], 0.004, { seg: 4 });
+    }
+    if (p.hood !== false) into(CEIL, () => { cb('steel', hob - 0.3, hob + 0.3, 1.62, 1.68, 0, 0.53); cb('steel', hob - 0.1, hob + 0.1, 1.68, H, 0, 0.23, { cell: 0.4 }); });
+  }
+  COL.push({ k: 0, x0, z0, x1, z1 });
+});
+
+// oval wicker crib 1.25 x 0.78, long side along X
+piece('crib', { name: 'Crib', add: 17 }, function (p) {
+  pAt(p, () => {
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) BAR('oak', [sx * 0.5, 0, sz * 0.3], [sx * 0.36, 0.5, sz * 0.2], 0.014, { r2: 0.018, seg: 8 });
+    BAR('oak', [-0.43, 0.24, -0.25], [-0.43, 0.24, 0.25], 0.012, { seg: 6 }); BAR('oak', [0.43, 0.24, -0.25], [0.43, 0.24, 0.25], 0.012, { seg: 6 });
+    LA('wickerWhite', 0, 0.45, 0, [[0.001, 0], [0.5, 0], [0.6, 0.3], [0.625, 0.325], [0.585, 0.325], [0.5, 0.06], [0.001, 0.05]], { seg: 40, sz: 0.62 });
+    CY('linen', 0, 0.5, 0, 0.5, 0.5, 0.06, { seg: 30, sz: 0.62 });
+    RB('beige', 0.12, 0.555, 0, 0.5, 0.03, 0.46, 0.012, { occ: false });
+    SP('linen', -0.34, 0.6, 0, 1, { sx: 0.1, sy: 0.04, sz: 0.16, seg: 12, hseg: 8 });
+    occLocal(xf(0, 0.475, 0), 0.7, 0.05, 0.43, albOf('wickerWhite'));
+    colRect(-0.62, -0.39, 0.62, 0.39);
+  });
+});
+
+// runs along X only
+piece('curtain', { name: 'Curtain' }, function (p) { curtain(p.x0, p.x1, p.z, p.y0 === undefined ? 0.02 : p.y0, p.y1 === undefined ? 2.66 : p.y1); });
+
+piece('curtainTrack', { name: 'Curtain track' }, function (p) { into(CEIL, () => BX('trim', p.x0, 2.66, p.z - 0.03, p.x1, H, p.z + 0.03)); });
+
+// oak table w x d (1.48 x 0.745) laid for a meal, two chairs on each long side; ends 'w', 'e', 'we' or '': chairs at the ends
+piece('diningSet', { name: 'Dining table', add: 12, values: { w: 1.48, d: 0.745, ends: '' } }, function (p) {
+  //                (with a plate each unless endPlates is false). native: long side along X
+  const w = p.w || 1.48, d = p.d || 0.745, ty = 0.75, hw = w / 2, hd = d / 2, ends = p.ends === undefined ? 'w' : p.ends;
+  pAt(p, () => {
+    RB('oakStave', 0, ty - 0.04, 0, w, 0.04, d, 0.008, { cell: 0.2 });
+    for (const x of [-hw + 0.21, hw - 0.21]) {
+      BAR('blackMetal', [x, 0, -hd + 0.08], [x, ty - 0.04, -hd + 0.17], 0.016, { seg: 8 }); BAR('blackMetal', [x, 0, hd - 0.08], [x, ty - 0.04, hd - 0.17], 0.016, { seg: 8 });
+      BX('blackMetal', x - 0.016, ty - 0.07, -hd + 0.15, x + 0.016, ty - 0.04, hd - 0.15, { occ: false });
+    }
+    colRect(-hw, -hd, hw, hd);
+    BX('linen', -0.25, ty, -hd - 0.042, -0.01, ty + 0.003, hd + 0.042, { occ: false, cell: 0.2 });   // runner
+    BX('linen', -0.25, ty - 0.14, -hd - 0.045, -0.01, ty + 0.003, -hd - 0.042, { occ: false }); BX('linen', -0.25, ty - 0.14, hd + 0.042, -0.01, ty + 0.003, hd + 0.045, { occ: false });
+    const plates = [[-hw + 0.29, -0.2], [hw - 0.27, -0.2], [-hw + 0.29, 0.2], [hw - 0.27, 0.2]];
+    if (p.endPlates !== false) { if (ends.includes('w')) plates.push([-hw + 0.13, 0]); if (ends.includes('e')) plates.push([hw - 0.13, 0]); }
+    for (const [x, z] of plates) LA('ceramic', x, ty, z, [[0.001, 0], [0.07, 0], [0.125, 0.016], [0.118, 0.016], [0.07, 0.006], [0.001, 0.006]], { seg: 20 });
+    place(-0.15, ty + 0.003, 0, 0, () => {                         // jug of yellow flowers
+      LA('teal', 0, 0, 0, [[0.001, 0], [0.045, 0], [0.066, 0.07], [0.05, 0.15], [0.03, 0.19], [0.036, 0.2]], { seg: 16 });
+      const R = rng(19);
+      for (let i = 0; i < 9; i++) {
+        const a = R() * TAU, r = 0.03 + R() * 0.09, h = 0.3 + R() * 0.12, x = Math.cos(a) * r, z = Math.sin(a) * r;
+        BAR('leafA', [0, 0.18, 0], [x, h, z], 0.0025, { seg: 4 });
+        SP('yellow', x, h, z, 0.024, { seg: 8, hseg: 6, sy: 0.7 });
+      }
+    });
+    LA('bottle', 0.05, ty, -0.09, [[0.001, 0], [0.037, 0], [0.037, 0.19], [0.014, 0.25], [0.014, 0.31], [0.001, 0.31]], { seg: 14 });
+    wineGlass(0.17, ty, -0.05, true); wineGlass(0.21, ty, 0.11, true); wineGlass(0.32, ty, 0.06, false);
+    diningChair(-0.17 * w, -hd - 0.16, 0.06); diningChair(0.27 * w, -hd - 0.17, -0.05);
+    diningChair(-0.21 * w, hd + 0.195, PI + 0.08); diningChair(0.32 * w, hd + 0.185, PI - 0.04);
+    if (ends.includes('w')) diningChair(-hw - 0.29, -0.0175, PI / 2 + 0.05);
+    if (ends.includes('e')) diningChair(hw + 0.29, 0.02, -PI / 2 - 0.04);
+  });
+});
+
+// recessed spot: I, col, ch
+piece('downlight', {}, function (p) { downlight(p.x, p.z, p.I || 0.75, colOf(p.col), p.ch || 2); });
+
+// native: on a west wall at (x, z), facing east
+piece('entryPhone', { name: 'Entry phone' }, function (p) {
+  pAt(p, () => { BX('switch', 0, 1.36, -0.05, 0.022, 1.56, 0.05, { occ: false }); BX('plastic', 0.022, 1.44, -0.03, 0.024, 1.54, 0.03, { occ: false }); });
+});
+
+// drum shade on a stem, lit day and evening
+piece('floorLamp', { name: 'Floor lamp', add: 9 }, function (p) {
+  pAt(p, () => {
+    CY('blackMetal', 0, 0, 0, 0.15, 0.16, 0.02, { seg: 24 }); BAR('blackMetal', [0, 0.02, 0], [0, 1.36, 0], 0.011, { seg: 8 });
+    CY('lampOn', 0, 1.3, 0, 0.15, 0.19, 0.27, { seg: 28, open: true, occ: false }); CY('lampOn', 0, 1.3, 0, 0.19, 0.19, 0.002, { seg: 28, occ: false });
+    colCircle(0, 0, 0.16);
+    pLamp(0, 1.42, 0, 0.85, WARM, 1, { glow: 0.9 });
+  });
+});
+
+// fridge-freezer w x d x h (0.66 x 0.6 x 1.9). native: back to a north wall at (x, z), facing south
+piece('fridge', { name: 'Fridge', add: 25 }, function (p) {
+  const w = p.w || 0.66, d = p.d || 0.6, h = p.h || 1.9, hw = w / 2, N = { occ: false };
+  pAt(p, () => {
+    BX('fridge', -hw, 0.02, 0.02, hw, h, 0.02 + d, { cell: 0.4 });
+    BX('fridge', -hw + 0.004, 0.72, 0.02 + d, hw - 0.004, h - 0.004, 0.042 + d, { occ: false, cell: 0.4 }); BX('fridge', -hw + 0.004, 0.03, 0.02 + d, hw - 0.004, 0.705, 0.042 + d, N);
+    BX('steel', -hw + 0.04, 0.95, 0.042 + d, -hw + 0.062, 1.6, 0.07 + d, N); BX('steel', -hw + 0.04, 0.3, 0.042 + d, -hw + 0.062, 0.62, 0.07 + d, N);
+    BX('plinth', -hw + 0.02, 0, 0.07, hw - 0.02, 0.02, d, N);
+    colRect(-hw - 0.01, 0, hw + 0.01, d + 0.07);
+  });
+});
+
+// y: the worktop
+piece('fruitBowl', { name: 'Fruit bowl' }, function (p) {
+  place(p.x, p.y || 0.9, p.z, 0, () => {
+    LA('ochre', 0, 0, 0, [[0.001, 0], [0.07, 0], [0.15, 0.07], [0.142, 0.07], [0.066, 0.01], [0.001, 0.01]], { seg: 20 });
+    for (const [x, z, m] of [[0.04, 0.02, 'yellow'], [-0.05, 0.03, 'yellow'], [0, -0.055, 'yellow'], [0.01, 0.01, 'leafC'], [-0.03, -0.02, 'yellow']]) SP(m, x, 0.045 + (m === 'leafC' ? 0.045 : 0), z, 0.034, { sy: 0.9 });
+  });
+});
+
+// four storage jars in a row southwards from (x, z), on the worktop
+piece('jars', { name: 'Jars' }, function (p) {
+  pAt(p, () => { for (let i = 0; i < 4; i++) { const z = i * 0.13, m = i % 2 ? 'teal' : 'ceramic', h = 0.12 + (i % 2) * 0.03; CY(m, 0, 0.9, z, 0.048, 0.044, h, { seg: 14 }); CY('oak', 0, 0.9 + h, z, 0.05, 0.05, 0.016, { seg: 14 }); } });
+});
+
+// oak wall shelf of length w (0.8) with storage jars, bowls and a small plant. native: on a north wall, facing south
+piece('kitchenShelf', { name: 'Kitchen shelf' }, function (p) {
+  const w = p.w || 0.8, a = -0.375 * w, b = -0.2 * w, c = 0.1 * w, d = 0.375 * w;
+  pAt(p, () => {
+    BX('oak', -w / 2, 1.58, 0.006, w / 2, 1.61, 0.2, { cell: 0.2 });
+    CY('ceramic', a, 1.61, 0.1, 0.05, 0.045, 0.13, { seg: 14 }); CY('oak', a, 1.74, 0.1, 0.052, 0.052, 0.018, { seg: 14 });
+    CY('teal', b, 1.61, 0.1, 0.045, 0.04, 0.1, { seg: 14 }); CY('oak', b, 1.71, 0.1, 0.047, 0.047, 0.016, { seg: 14 });
+    for (let i = 0; i < 3; i++) LA('ceramic', c, 1.61 + i * 0.022, 0.1, [[0.001, 0], [0.04, 0], [0.075, 0.045], [0.07, 0.045], [0.038, 0.008], [0.001, 0.008]], { seg: 14 });
+    plantSpiky(d, 0.1, { seed: 31, n: 16, len: 0.2, wid: 0.018, potR: 0.045, potH: 0.08, mats: ['leafA', 'leafB'], y: 1.61 });
+  });
+});
+
+// oak cabinet 0.9 high: rect; books and a bowl on top
+piece('lowShelf', { name: 'Low cabinet', add: 19, values: { w: 1.2, d: 0.4 } }, function (p) {
+  const [x0, z0, x1, z1] = p.rect, alongZ = z1 - z0 >= x1 - x0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  BX('oak', x0, 0, z0, x1, 0.9, z1, { cell: 0.25 });
+  COL.push({ k: 0, x0, z0, x1, z1 });
+  books(alongZ ? cx : x0 + 0.23, 0.9, alongZ ? z0 + 0.23 : cz, 0.3, BOOKS);
+  LA('ochre', alongZ ? cx : x1 - 0.3, 0.9, alongZ ? z1 - 0.3 : cz, [[0.001, 0], [0.035, 0], [0.06, 0.04], [0.054, 0.04], [0.032, 0.007], [0.001, 0.007]], { seg: 14 });
+});
+
+// low oak console 1.7 long with a television, books and a vase. native: back to a west wall at (x, z), facing east
+piece('media', { name: 'TV console', add: 8 }, function (p) {
+  pAt(p, () => pFrom(3.46, 5.81, () => {
+    BX('blackMetal', 3.53, 0, 5.02, 3.81, 0.1, 6.6, { occ: false });
+    RB('oak', 3.67, 0.1, 5.81, 0.34, 0.36, 1.7, 0.008, { cell: 0.25 });
+    for (const z of [5.385, 5.81, 6.235]) BX('plinth', 3.838, 0.12, z - 0.002, 3.8415, 0.44, z + 0.002, { occ: false });
+    colRect(3.46, 4.96, 3.84, 6.66);
+    BX('plastic', 3.6, 0.46, 5.7, 3.74, 0.474, 5.96, { occ: false }); BX('plastic', 3.655, 0.474, 5.8, 3.675, 0.57, 5.86, { occ: false });
+    BX('plastic', 3.648, 0.55, 5.215, 3.682, 1.26, 6.445, { cell: 0.3 });
+    BX('screen', 3.682, 0.562, 5.227, 3.685, 1.248, 6.433);
+    books(3.67, 0.46, 6.37, 0.2, BOOKS);
+    LA('pot', 3.66, 0.46, 5.09, [[0.001, 0], [0.05, 0], [0.075, 0.1], [0.05, 0.22], [0.028, 0.27], [0.034, 0.29]], { seg: 16 });
+    const R = rng(13);
+    for (let i = 0; i < 5; i++) BAR('stem', [3.66, 0.74, 5.09], [3.66 + (R() - 0.3) * 0.2, 1.05 + R() * 0.25, 5.09 + (R() - 0.5) * 0.3], 0.003, { seg: 4 });
+    LA('ochre', 3.7, 0.46, 6.58, [[0.001, 0], [0.035, 0], [0.06, 0.04], [0.054, 0.04], [0.032, 0.007], [0.001, 0.007]], { seg: 14 });
+  }));
+});
+
+// floating shelf under a round mirror, with a vase of twigs and a bowl. native: on a west wall, facing east. zone
+piece('mirrorShelf', { name: 'Mirror and shelf' }, function (p) {
+  pAt(p, () => {
+    BX('oak', 0, 0.905, -0.4, 0.18, 0.945, 0.4, { cell: 0.25 });
+    colRect(0, -0.4, 0.12, 0.4);
+    CY('blackMetal', 0, 1.494, 0, 0.3, 0.3, 0.012, { seg: 40, rz: PI / 2 });
+    pMirror({ kind: 'disc', r: 0.285, p: [0.0075, 1.5, 0], n: [1, 0, 0] }, p.zone);
+    LA('potWhite', 0.09, 0.945, -0.25, [[0.001, 0], [0.04, 0], [0.06, 0.08], [0.035, 0.17], [0.03, 0.2]], { seg: 14 });
+    const R = rng(7);
+    for (let i = 0; i < 6; i++) BAR('stem', [0.09, 1.13, -0.25], [0.09 + (R() - 0.3) * 0.16, 1.42 + R() * 0.16, -0.25 + (R() - 0.5) * 0.24], 0.003, { seg: 4 });
+    LA('ochre', 0.09, 0.945, 0.21, [[0.001, 0], [0.07, 0], [0.085, 0.02], [0.078, 0.02], [0.066, 0.006], [0.001, 0.006]], { seg: 16 });
+  });
+});
+
+// Modular three-seat sofa with a loose ottoman, 2.81 wide, 0.82 deep (1.43 with the ottoman), 0.85 high
+// (gorgia.ge MLM-110293, BM-00227947): slim track arms, a box cushion under each flanged pillow-top seat, three big
+// flanged back pillows leaning on a low frame, two throw pillows, near-black block legs. native: the sitter faces south.
+// Values: `mat` the fabric (default chenille), `legs` (default ebony), `ottoman` 1 in front of the east seat
+// (default), -1 the west seat, 0 none; `pillows` 0 leaves the two throw pillows out.
+piece('modularSofa', { name: 'Modular sofa', add: 4 }, function (p) {
+  const F = p.mat || 'chenille', L = p.legs || 'ebony', side = p.ottoman === undefined ? 1 : p.ottoman;
+  const W = 2.81, D = 0.82, ARM = 0.15, ARMH = 0.62, LEG = 0.11, BASE = 0.30, BOX = 0.375;
+  const SW = (W - 2 * ARM) / 3, z0 = -D / 2, z1 = D / 2, OD = 0.6;
+  const legs = (xa, xb, za, zb) => { for (const x of [xa + 0.06, xb - 0.06]) for (const z of [za + 0.06, zb - 0.06]) B(L, x, 0, z, 0.055, LEG + 0.01, 0.055); };
+  // one seat: frame, box cushion with a sewn welt, pillow top whose flange laps over the front
+  const seat = (cx, za, zb, seed) => {
+    RB(F, cx, LEG, (za + zb) / 2, SW - 0.008, BASE - LEG, zb - za, 0.03, { cell: 0.2 });
+    RB(F, cx, BASE, (za + 0.12 + zb) / 2, SW - 0.012, BOX - BASE, zb - za - 0.12, 0.03, { cell: 0.2 });
+    RB(F, cx, BOX - 0.006, (za + 0.12 + zb) / 2, SW - 0.004, 0.009, zb - za - 0.112, 0.004, { occ: false });
+    PIL(F, cx, BOX + 0.035, (za + 0.1 + zb) / 2 - 0.005, SW - 0.045, 0.125, zb - za - 0.15, { lower: 0.32, flange: 0.024, seed, lump: 0.035 });
+  };
+  pAt(p, () => {
+    const mods = [[-W / 2, -W / 2 + ARM + SW], [-SW / 2, SW / 2], [W / 2 - ARM - SW, W / 2]];
+    mods.forEach(([xa, xb]) => legs(xa, xb, z0, z1));
+    for (const sx of [-1, 1]) RB(F, sx * (W / 2 - ARM / 2), LEG, 0, ARM, ARMH - LEG, D, 0.05, { k: 3, cell: 0.15 });
+    for (let k = 0; k < 3; k++) {
+      const cx = (k - 1) * SW;
+      // low back frame per module; the back pillows hide it from the front
+      RB(F, cx, BASE, z0 + 0.08, SW - 0.008, 0.40, 0.16, 0.04, { cell: 0.2 });
+      seat(cx, z0, z1, 11 + k);
+      PIL(F, cx, 0.625, -0.175, SW - 0.03, 0.2, 0.42, { rx: PI / 2 - 0.2, lower: 0.42, flange: 0.024, seed: 21 + k, lump: 0.06 });
+    }
+    if (p.pillows !== 0) {
+      PIL(F, -1.13, 0.64, -0.1, 0.44, 0.15, 0.44, { rx: PI / 2 - 0.42, ry: 0.55, rz: -0.18, flange: 0.02, seed: 31 });
+      PIL(F, 1.13, 0.64, -0.1, 0.44, 0.15, 0.44, { rx: PI / 2 - 0.42, ry: -0.55, rz: 0.18, flange: 0.02, seed: 32 });
+    }
+    colRect(-W / 2, z0, W / 2, z1);
+    if (side) {
+      const cx = side * SW, za = z1 + 0.01, zb = za + OD;
+      legs(cx - SW / 2, cx + SW / 2, za, zb);
+      RB(F, cx, LEG, (za + zb) / 2, SW - 0.008, BASE - LEG, OD, 0.03, { cell: 0.2 });
+      RB(F, cx, BASE, (za + zb) / 2, SW - 0.012, BOX - BASE, OD - 0.004, 0.03, { cell: 0.2 });
+      RB(F, cx, BOX - 0.006, (za + zb) / 2, SW - 0.004, 0.009, OD + 0.004, 0.004, { occ: false });
+      PIL(F, cx, BOX + 0.035, (za + zb) / 2, SW - 0.045, 0.125, OD - 0.04, { lower: 0.32, flange: 0.024, seed: 15, lump: 0.035 });
+      colRect(cx - SW / 2, za, cx + SW / 2, zb);
+    }
+  });
+});
+
+// drum table with a globe lamp
+piece('nightTable', { name: 'Bedside table', add: 16 }, function (p) {
+  pAt(p, () => {
+    CY('darkWood', 0, 0, 0, 0.19, 0.19, 0.5, { seg: 28 });
+    CY('brass', 0, 0.5, 0, 0.055, 0.06, 0.012, { seg: 16 }); CY('brass', 0, 0.512, 0, 0.008, 0.008, 0.09, { seg: 8 });
+    SP('lampOn', 0, 0.68, 0, 0.085, { seg: 16, hseg: 12 });
+    colCircle(0, 0, 0.19);
+    pLamp(0.03, 0.72, 0, 0.42, WARM, 1, { glow: 0.75 });
+  });
+});
+
+// black dome, evening only; y: its rim
+piece('pendant', { name: 'Pendant lamp', add: 30 }, function (p) { pendant(p.x, p.z, p.y || 1.55); });
+
+// seed, h, n, leaf, stems, ratio, mats, pot, potR, potH, y
+piece('plantLeafy', { name: 'Leafy plant', add: 22, values: { seed: 3, h: 1.4, n: 16, leaf: 0.3, mats: ['leafA', 'leafA', 'leafD'], pot: 'pot', potR: 0.17, potH: 0.34 } }, function (p) { plantLeafy(p.x, p.z, p); });
+
+// seed, n, len, wid, mats, pot, potR, potH, y
+piece('plantSpiky', { name: 'Spiky plant', add: 23, values: { seed: 4, n: 46, len: 0.62, wid: 0.03, mats: ['leafB', 'leafB', 'leafA'], pot: 'potWhite', potR: 0.15, potH: 0.36 } }, function (p) { plantSpiky(p.x, p.z, p); });
+
+// square pot with a round bush; seed
+piece('planter', { name: 'Planter', add: 24, values: { seed: 21 } }, function (p) {
+  pAt(p, () => {
+    BX('pot', -0.2, 0, -0.2, 0.2, 0.38, 0.2, { cell: 0.2 });
+    BX('soil', -0.18, 0.36, -0.18, 0.18, 0.37, 0.18, { occ: false });
+    colRect(-0.2, -0.2, 0.2, 0.2);
+    bush(0, 0.34, 0, 0.31, p.seed || 21);
+  });
+});
+
+// panel radiator 0.8 long. native: on a south wall at (x, z), facing north
+piece('radiator', { name: 'Radiator', add: 27 }, function (p) {
+  pAt(p, () => pFrom(0.95, 9.42, () => {
+    BX('trim', 0.55, 0.16, 9.335, 1.35, 0.7, 9.4, { occ: false, cell: 0.3 });
+    for (let i = 0; i < 16; i++) BX('trim', 0.556 + i * 0.05, 0.17, 9.325, 0.59 + i * 0.05, 0.69, 9.336, { occ: false });
+    for (const x of [0.6, 1.3]) BAR('chrome', [x, 0, 9.37], [x, 0.16, 9.37], 0.008, { seg: 6 });
+  }));
+});
+
+// native: the sitter faces south
+piece('rattanChair', { name: 'Rattan chair', add: 14 }, function (p) {
+  pAt(p, () => {
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) BAR('wicker', [sx * 0.28, 0, sz * 0.28], [sx * 0.25, 0.35, sz * 0.25], 0.016, { seg: 8, uv: 'box' });
+    RB('wicker', 0, 0.33, 0, 0.6, 0.05, 0.58, 0.02);
+    put('wicker', bendGeo(roundedBoxGeo(1.25, 0.36, 0.035, 0.015, 2, 0.08), 0.33), xf(0, 0.56, -0.33, PI));
+    RB('skyblue', 0, 0.38, 0.02, 0.5, 0.09, 0.5, 0.04, { occ: false });
+    colCircle(0, 0, 0.36);
+  });
+});
+
+// round plaid rug, radius 0.78
+piece('roundRug', { name: 'Round rug', add: 10 }, function (p) {
+  LA('rugPlaid', p.x, 0, p.z, [[0.78, 0], [0.78, 0.01], [0.66, 0.01], [0.54, 0.01], [0.42, 0.01], [0.3, 0.01], [0.18, 0.01], [0.08, 0.01], [0.001, 0.01]], { seg: 48, uv: 'box', uvScale: 1 / 1.56, uo: 0.5, vo: 0.5 });
+});
+
+// flat rectangle on the floor: mat, rect, h (0.012), round (corner radius)
+piece('rug', { name: 'Rug', add: 11, values: { mat: 'rugTri', w: 1.6, d: 2.3 } }, function (p) {
+  const [x0, z0, x1, z1] = p.rect, h = p.h || 0.012;
+  if (p.round) RB(p.mat, (x0 + x1) / 2, 0, (z0 + z1) / 2, x1 - x0, h, z1 - z0, p.round, { occ: false, cell: 0.2 });
+  else BX(p.mat, x0, 0, z0, x1, h, z1, { occ: false, cell: 0.2 });
+});
+
+// Two-and-a-half-seat shell sofa 1.72 x 0.82, 0.80 high: channel-tufted back that curves round into low flared arms,
+// one long seat cushion, tapered pale-wood legs (after a JYSK photo). native: the sitter faces south.
+// Values: `mat` the fabric (default terracotta), `legs` the leg material (default oak).
+piece('shellSofa', { name: 'Shell sofa', add: 3 }, function (p) {
+  const F = p.mat || 'terracotta', L = p.legs || 'oak';
+  const LEG = 0.18, SEAT = 0.40, BACK = 0.80, ARM = 0.62;   // heights
+  const AX = 0.745, BZ = -0.32, RC = 0.27, FRONT = 0.33;    // flute centreline: arm x, back z, corner radius, arm front z
+  pAt(p, () => {
+    for (const [x, z] of [[-0.7, -0.29], [0.7, -0.29], [-0.7, 0.29], [0.7, 0.29]]) CY(L, x, 0, z, 0.024, 0.015, LEG, { seg: 12, rx: -z * 0.25, rz: x * 0.07 });   // splayed outwards
+    RB(F, 0, LEG, 0.02, 1.68, SEAT - LEG + 0.02, 0.78, 0.07, { cell: 0.3 });           // base under the cushion
+    RB(F, 0, SEAT - 0.01, 0.07, 2 * (AX - 0.07), 0.13, 0.66, 0.06, { cell: 0.25, occ: false }); // seat cushion
+    // The U-shaped shell: walk its centreline (back, two quarter turns, arms) and stand a rounded flute every ~0.12 m.
+    // An outer skin follows the same line so the outside reads smooth; the grooves only show inside.
+    const cx = AX - RC, cz = BZ + RC, arc = PI / 2 * RC, side = FRONT - cz;
+    const half = cx + arc + side, n = Math.round(half / 0.12), step = half / n;
+    const at = (s) => {                                   // s from the middle of the back outwards (x >= 0 side)
+      if (s <= cx) return { x: s, z: BZ, a: 0, top: BACK };
+      if (s <= cx + arc) { const t = (s - cx) / RC; return { x: cx + Math.sin(t) * RC, z: cz - Math.cos(t) * RC, a: t, top: lerp(BACK, ARM + 0.05, sstep(0, PI / 2, t)) }; }
+      const u = (s - cx - arc) / side;
+      return { x: AX, z: cz + u * side, a: PI / 2, top: ARM + 0.05 - u * 0.05 };
+    };
+    for (const sx of [-1, 1]) {
+      for (let i = 0; i < n; i++) {
+        const q = at((i + 0.5) * step), ry = -sx * q.a;
+        const ox = Math.sin(q.a) * 0.035, oz = -Math.cos(q.a) * 0.035;   // outwards from the seat
+        const lean = q.a < 0.01 ? -0.1 : 0;
+        RB(F, sx * q.x, SEAT - 0.04, q.z, step * 1.0, q.top - SEAT - 0.01, 0.16, 0.042, { ry, rx: lean, cell: 0.2, occ: false });
+        // smooth outer skin; its top tucks under the rolled edge below
+        RB(F, sx * (q.x + ox), LEG + 0.02, q.z + oz, step * 1.3, q.top - LEG - 0.08, 0.12, 0.03, { ry, rx: lean, cell: 0.2, occ: false });
+      }
+      // flared arm front: a round end cap where the shell meets the seat front
+      RB(F, sx * AX, LEG + 0.02, FRONT + 0.02, 0.19, ARM - LEG - 0.03, 0.1, 0.05, { cell: 0.2, occ: false });
+    }
+    // one rolled top edge over the whole U, so the channels run into a smooth roll as on the real sofa
+    const RR = 0.08, roll = [];
+    for (let i = 0; i <= 40; i++) {
+      const s = (i / 40) * 2 * half - half, q = at(Math.abs(s)), sg = s < 0 ? -1 : 1;
+      roll.push([sg * q.x, q.top - RR, q.z - (q.a < 0.01 ? 0.02 : 0)]);
+    }
+    TU(F, roll, RR, { n: 120, seg: 14, occ: false });
+    for (const sx of [-1, 1]) { const q = at(half); SP(F, sx * q.x, q.top - RR, q.z, RR, { occ: false }); }
+    // light stand-ins for the bake: back, arms, base (kept inside the visible shapes)
+    pOcc(-0.6, SEAT + 0.04, -0.4, 0.6, BACK - 0.08, -0.29, albOf(F));
+    for (const sx of [-1, 1]) pOcc(sx * 0.745 - 0.055, LEG + 0.05, -0.05, sx * 0.745 + 0.055, ARM - 0.06, 0.3, albOf(F));
+    colRect(-0.86, -0.41, 0.86, 0.41);
+  });
+});
+
+// walk-in shower: low tray w x d (0.9 x 1.0), mixer and rain head on the back wall, glass screen on side
+piece('shower', { name: 'Shower', add: 31 }, function (p) {
+  //            glass 'w' | 'e' | '' (default 'w'). native: back to a north wall at (x, z), the tray running south
+  const w = p.w || 0.9, d = p.d || 1.0, g = p.glass === undefined ? 'w' : p.glass;
+  pAt(p, () => {
+    B('ceramic', 0, 0, d / 2, w, 0.035, d, { cell: 0.3, occ: false });
+    put('chrome', new T.CircleGeometry(0.05, 18), xf(0, 0.036, d / 2, 0, -PI / 2), { uv: 'keep' });
+    BX('chrome', -0.09, 0.98, 0, 0.09, 1.1, 0.04);
+    BAR('chrome', [0, 1.1, 0.02], [0, 2.12, 0.02], 0.011, { seg: 8 });
+    TU('chrome', [[0, 2.1, 0.02], [0, 2.16, 0.06], [0, 2.16, 0.3]], 0.011, { seg: 8 });
+    CY('chrome', 0, 2.125, 0.3, 0.115, 0.115, 0.012, { seg: 24 });
+    if (g) {
+      const sx = g === 'e' ? 1 : -1, gx = sx * (w / 2 - 0.01);
+      BXS('glass', gx - 0.004, 0.035, 0, gx + 0.004, 2.0, d - 0.04, { occ: false });
+      BXS('chrome', gx - 0.012, 0.035, d - 0.06, gx + 0.012, 2.0, d - 0.035, { occ: false });
+      colRect(gx - 0.03, 0, gx + 0.03, d - 0.03);
+    }
+  });
+});
+
+// tripod table with a wicker tray
+piece('sideTable', { name: 'Side table', add: 7 }, function (p) {
+  pAt(p, () => {
+    CY('plastic', 0, 0.47, 0, 0.22, 0.22, 0.03, { seg: 30 });
+    for (let i = 0; i < 3; i++) { const a = i * TAU / 3 - PI / 2; BAR('oak', [Math.cos(a) * 0.27, 0, Math.sin(a) * 0.27], [Math.cos(a) * 0.1, 0.47, Math.sin(a) * 0.1], 0.013, { r2: 0.017, seg: 8 }); }
+    LA('wicker', 0, 0.5, 0, [[0.001, 0], [0.12, 0], [0.135, 0.03], [0.125, 0.03], [0.115, 0.008], [0.001, 0.008]], { seg: 20, uv: 'box' });
+    colCircle(0, 0, 0.22);
+  });
+});
+
+// three-seat sofa 2.52 x 1.11. native: the sitter faces south (back to the north)
+piece('sofa', { name: 'Sofa', add: 1 }, function (p) {
+  pAt(p, () => {
+    for (const [x, z] of [[-1.16, -0.45], [1.16, -0.45], [-1.16, 0.45], [1.16, 0.45]]) CY('blackMetal', x, 0, z, 0.022, 0.018, 0.08, { seg: 8 });
+    RB('sofa', 0, 0.08, 0, 2.52, 0.3, 1.11, 0.04, { cell: 0.3 });
+    RB('sofa', 0, 0.38, -0.43, 2.52, 0.42, 0.25, 0.06, { cell: 0.3 });
+    for (const s of [-1, 1]) RB('sofa', s * 1.13, 0.38, 0.07, 0.26, 0.24, 0.97, 0.06, { cell: 0.3 });
+    for (const x of [-0.67, 0, 0.67]) { RB('sofa', x, 0.38, 0.12, 0.655, 0.14, 0.8, 0.05, { cell: 0.25 }); RB('sofa', x, 0.5, -0.25, 0.64, 0.36, 0.16, 0.07, { rx: -0.16, occ: false }); }
+    RB('cushion', 0.4, 0.55, -0.12, 0.42, 0.4, 0.13, 0.06, { rx: -0.42, ry: 0.15, occ: false });
+    RB('cushion', 0.84, 0.53, 0.12, 0.44, 0.13, 0.42, 0.06, { ry: 0.5, rz: 0.1, occ: false });
+    RB('cushion', -0.86, 0.55, -0.1, 0.48, 0.4, 0.14, 0.06, { rx: -0.5, ry: -0.3, occ: false });
+    RB('beige', 0.36, 0.515, 0.2, 0.5, 0.022, 0.72, 0.01, { occ: false, cell: 0.2 });           // throw spilling over the seat front
+    RB('beige', 0.36, 0.03, 0.572, 0.5, 0.5, 0.022, 0.01, { occ: false, cell: 0.2 }); RB('beige', 0.34, 0, 0.66, 0.52, 0.03, 0.2, 0.012, { occ: false, ry: 0.1 });
+    B('paper', -0.3, 0.522, 0.2, 0.2, 0.006, 0.27, { ry: 0.3, rz: 0.03 }); B('paper', -0.11, 0.522, 0.26, 0.2, 0.006, 0.27, { ry: 0.3, rz: -0.03 });   // open magazine
+    colRect(-1.26, -0.555, 1.26, 0.555);
+  });
+});
+
+// rail with a tea towel on a cabinet front. native: front faces south, (x, z) on it
+piece('teaRail', { name: 'Tea towel' }, function (p) {
+  pAt(p, () => {
+    BX('steel', -0.205, 0.8, 0, 0.205, 0.812, 0.024, { occ: false });
+    RB('stripe', -0.045, 0.5, 0.03, 0.2, 0.318, 0.012, 0.005, { occ: false }); RB('stripe', -0.045, 0.62, 0.008, 0.2, 0.196, 0.008, 0.003, { occ: false });
+  });
+});
+
+// native: back to a north wall at (x, z), facing south
+piece('toilet', { name: 'Toilet' }, function (p) {
+  const cer = albOf('ceramic');
+  pAt(p, () => {
+    RB('ceramic', 0, 0.4, 0.105, 0.38, 0.36, 0.17, 0.03);
+    RB('ceramic', 0, 0.76, 0.105, 0.395, 0.022, 0.185, 0.008);
+    CY('chrome', 0, 0.782, 0.105, 0.022, 0.022, 0.006, { seg: 14 });
+    LA('ceramic', 0, 0, 0.43, [[0.001, 0], [0.12, 0], [0.13, 0.12], [0.185, 0.36], [0.195, 0.4], [0.15, 0.4], [0.12, 0.3], [0.06, 0.25], [0.001, 0.24]], { seg: 24, sz: 1.3 });
+    CY('ceramic', 0, 0.4, 0.43, 0.2, 0.2, 0.022, { seg: 28, sz: 1.3 });
+    BX('ceramic', -0.1, 0.1, 0.19, 0.1, 0.4, 0.27, { occ: false });
+    occLocal(xf(0, 0.2, 0.43), 0.3, 0.4, 0.42, cer);
+    colRect(-0.2, 0, 0.2, 0.7);
+  });
+});
+
+// native: on an east wall at (x, z), facing west
+piece('towelLadder', { name: 'Towel ladder' }, function (p) {
+  pAt(p, () => {
+    const xl = -0.032;
+    for (const z of [-0.23, 0.23]) BAR('chrome', [xl, 0.78, z], [xl, 1.58, z], 0.011, { seg: 8 });
+    for (let i = 0; i < 7; i++) BAR('chrome', [xl, 0.84 + i * 0.115, -0.23], [xl, 0.84 + i * 0.115, 0.23], 0.008, { seg: 6 });
+    RB('towel', xl - 0.016, 1.06, 0, 0.036, 0.46, 0.36, 0.014, { occ: false });
+  });
+});
+
+// wall-hung walnut unit 0.77 wide with a vessel basin, mirror and light bar. native: back to a north wall, facing south. zone
+piece('vanity', { name: 'Basin' }, function (p) {
+  pAt(p, () => {
+    B('walnut', 0, 0.36, 0.255, 0.77, 0.44, 0.51);
+    BX('plinth', -0.385, 0.577, 0.508, 0.385, 0.583, 0.513, { occ: false });
+    BX('blackMetal', -0.155, 0.7, 0.51, 0.155, 0.712, 0.53, { occ: false }); BX('blackMetal', -0.155, 0.48, 0.51, 0.155, 0.492, 0.53, { occ: false });
+    const vz = 0.29, vt = 0.93;
+    rim('ceramic', 0, vt, vz, 0.62, 0.42, 0.56, 0.36, 0.05);
+    basin('ceramic', 0, vt, vz, 0.56, 0.36, 0.11, 0.05, { free: true });
+    BX('ceramic', -0.31, 0.8, vz - 0.21, 0.31, vt - 0.001, vz - 0.192, { occ: false }); BX('ceramic', -0.31, 0.8, vz + 0.192, 0.31, vt - 0.001, vz + 0.21, { occ: false });
+    BX('ceramic', -0.31, 0.8, vz - 0.192, -0.292, vt - 0.001, vz + 0.192, { occ: false }); BX('ceramic', 0.292, 0.8, vz - 0.192, 0.31, vt - 0.001, vz + 0.192, { occ: false });
+    CY('chrome', 0, vt - 0.109, vz, 0.022, 0.022, 0.004, { seg: 12, free: true });
+    CY('chrome', 0, 0.8, 0.045, 0.022, 0.026, 0.03, { seg: 12 });                                // tall tap behind it
+    TU('chrome', [[0, 0.82, 0.045], [0, 1.07, 0.045], [0, 1.11, 0.085], [0, 1.09, 0.155], [0, 1.05, 0.165]], 0.011, { seg: 8, n: 24 });
+    B('chrome', 0.05, 0.83, 0.045, 0.07, 0.012, 0.016, { ry: 0.5 });
+    BX('blackMetal', -0.36, 1.15, 0, 0.36, 1.97, 0.012, { occ: false });                           // mirror frame and light bar
+    BX('lampCool', -0.27, 2.0, 0.01, 0.27, 2.028, 0.045);
+    CY('ceramic', -0.3, 0.8, 0.43, 0.03, 0.035, 0.1, { seg: 12 }); CY('chrome', -0.3, 0.9, 0.43, 0.012, 0.012, 0.03, { seg: 8 });   // soap pump
+    colRect(-0.4, 0, 0.4, 0.54);
+    pMirror({ kind: 'rect', w: 0.7, h: 0.8, p: [0, 1.56, 0.0135], n: [0, 0, 1] }, p.zone);
+    pLamp(0, 1.97, 0.15, 0.28, COOL, 1, { glow: 0.5 });
+  });
+});
+
+// native: on an east wall, facing west; (x, z) on the wall face
+piece('wallLight', { name: 'Wall light' }, function (p) {
+  pAt(p, () => {
+    BX('alu', -0.04, 1.92, -0.06, 0, 2.08, 0.06, { occ: false });
+    BX('lampEve', -0.036, 1.914, -0.05, -0.004, 1.92, 0.05); BX('lampEve', -0.036, 2.08, -0.05, -0.004, 2.086, 0.05);
+    pLamp(-0.15, 1.9, 0, 0.7, SOFT, 2, { glow: 0.45 });
+  });
+});
+
+// flat television with a warm halo behind it. native: on an east wall at (x, z), facing west
+piece('wallTV', { name: 'Wall TV', add: 28 }, function (p) {
+  pAt(p, () => pFrom(3.34, 6.05, () => {
+    BX('plastic', 3.305, 0.93, 5.495, 3.34, 1.57, 6.605, { cell: 0.3 });
+    BX('screen', 3.301, 0.942, 5.507, 3.305, 1.558, 6.593);
+    put('halo', new T.PlaneGeometry(2.1, 1.5), xf(3.3375, 1.25, 6.05, -PI / 2), { uv: 'keep' });
+    pLamp(3.2, 1.25, 6.05, 0.2, WARM, 1, { glow: 0 });
+  }));
+});
+
+// free-standing walnut wardrobe 2.4 high: rect, face 'n'|'s'|'e'|'w'
+piece('wardrobe', { name: 'Wardrobe', add: 18, values: { face: 's', w: 1.2, d: 0.6 } }, function (p) {
+  const [x0, z0, x1, z1] = p.rect, f = p.face || 's', N = { occ: false }, ht = 2.4;
+  BX('walnut', x0, 0.04, z0, x1, ht, z1, { cell: 0.35 });
+  BX('plinth', x0 + 0.02, 0, z0 + 0.02, x1 - 0.02, 0.04, z1 - 0.02, N);
+  if (f === 'e' || f === 'w') {
+    const zm = (z0 + z1) / 2, xa = f === 'e' ? x1 : x0 - 0.004, xh = f === 'e' ? x1 : x0 - 0.01;
+    BX('plinth', xa, 0.06, zm - 0.003, xa + 0.004, ht - 0.02, zm + 0.003, N);
+    BX('blackMetal', xh, 0.9, zm - 0.12, xh + 0.01, 1.3, zm - 0.1, N); BX('blackMetal', xh, 0.9, zm + 0.1, xh + 0.01, 1.3, zm + 0.12, N);
+  } else {
+    const xm = (x0 + x1) / 2, za = f === 's' ? z1 : z0 - 0.004, zh = f === 's' ? z1 : z0 - 0.01;
+    BX('plinth', xm - 0.003, 0.06, za, xm + 0.003, ht - 0.02, za + 0.004, N);
+    BX('blackMetal', xm - 0.12, 0.9, zh, xm - 0.1, 1.3, zh + 0.01, N); BX('blackMetal', xm + 0.1, 0.9, zh, xm + 0.12, 1.3, zh + 0.01, N);
+  }
+  COL.push({ k: 0, x0, z0, x1, z1 });
+});
+
+// washing machine 0.6 wide. native: back to a north wall, facing south
+piece('washer', { name: 'Washing machine', add: 26 }, function (p) {
+  pAt(p, () => {
+    BX('fridge', -0.3, 0.02, 0.02, 0.3, 0.85, 0.54, { cell: 0.3 });
+    BX('plastic', -0.28, 0.72, 0.54, 0.28, 0.83, 0.544, { occ: false });
+    CY('steel', 0, 0.43, 0.548, 0.19, 0.19, 0.02, { seg: 28, rx: PI / 2 });
+    CY('screen', 0, 0.43, 0.556, 0.15, 0.15, 0.008, { seg: 28, rx: PI / 2 });
+    colRect(-0.31, 0, 0.31, 0.56);
+  });
+});
 // ---------- 50-bake.js : the light bake ----------
 // Works out, for every vertex, how much light reaches it: daylight through the glazing (A), the lamps that are
 // always on (B) and the evening lamps (C), each with one bounce gathered through a grid of probes.
@@ -3813,25 +3942,10 @@ async function boot() {
   // ---- furniture: pick a piece, drag it, turn it, take it away or add one; kept per flat in this browser ----
   // A changed piece is built again from its data; the light is baked again a moment after the last change.
   S.edit = false;
-  const NAMES = {
-    sofa: 'Sofa', cornerSofa: 'Corner sofa', shellSofa: 'Shell sofa', modularSofa: 'Modular sofa', armchair: 'Armchair', coffeeTable: 'Coffee table', sideTable: 'Side table', media: 'TV console',
-    floorLamp: 'Floor lamp', roundRug: 'Round rug', rug: 'Rug', diningSet: 'Dining table', bistroTable: 'Bistro table', rattanChair: 'Rattan chair',
-    bed: 'Double bed', nightTable: 'Bedside table', crib: 'Crib', wardrobe: 'Wardrobe', lowShelf: 'Low cabinet', bench: 'Hall bench',
-    coatBench: 'Coat bench', plantLeafy: 'Leafy plant', plantSpiky: 'Spiky plant', planter: 'Planter', fridge: 'Fridge', washer: 'Washing machine',
-    radiator: 'Radiator', wallTV: 'Wall TV', art: 'Picture', pendant: 'Pendant lamp', wallLight: 'Wall light', mirrorShelf: 'Mirror and shelf',
-    counter: 'Kitchen units', closet: 'Built-in wardrobe', toilet: 'Toilet', vanity: 'Basin', bath: 'Bath', towelLadder: 'Towel ladder',
-    entryPhone: 'Entry phone', kitchenShelf: 'Kitchen shelf', fruitBowl: 'Fruit bowl', jars: 'Jars', teaRail: 'Tea towel', curtain: 'Curtain',
-    curtainTrack: 'Curtain track', block: 'Block', box: 'Box', shower: 'Shower', acUnit: 'Air conditioner',
-  };
-  // what the Add list offers: piece, its values; w x d for pieces that fill a rectangle
-  const ADD = [
-    ['sofa'], ['cornerSofa'], ['shellSofa'], ['modularSofa'], ['armchair'], ['coffeeTable'], ['sideTable'], ['media'], ['floorLamp'], ['roundRug'],
-    ['rug', { mat: 'rugTri', w: 1.6, d: 2.3 }], ['diningSet', { w: 1.48, d: 0.745, ends: '' }], ['bistroTable'], ['rattanChair'],
-    ['bed'], ['nightTable'], ['crib'], ['wardrobe', { face: 's', w: 1.2, d: 0.6 }], ['lowShelf', { w: 1.2, d: 0.4 }], ['bench'], ['coatBench'],
-    ['plantLeafy', { seed: 3, h: 1.4, n: 16, leaf: 0.3, mats: ['leafA', 'leafA', 'leafD'], pot: 'pot', potR: 0.17, potH: 0.34 }],
-    ['plantSpiky', { seed: 4, n: 46, len: 0.62, wid: 0.03, mats: ['leafB', 'leafB', 'leafA'], pot: 'potWhite', potR: 0.15, potH: 0.36 }],
-    ['planter', { seed: 21 }], ['fridge'], ['washer'], ['radiator'], ['wallTV'], ['art', { mat: 'art1', y: 1.5, w: 0.7, h: 0.5 }], ['pendant'], ['shower'], ['acUnit'],
-  ];
+  // labels and the Add list come from the piece files in furniture/ (piece('t', { name, add, values }, ...))
+  const NAMES = Object.fromEntries(Object.entries(PIECE_INFO).filter(([, i]) => i.name).map(([t, i]) => [t, i.name]));
+  // what the Add list offers, in the order of each piece's add: piece, its values; w x d for pieces that fill a rectangle
+  const ADD = Object.entries(PIECE_INFO).filter(([, i]) => i.add).sort((a, b) => a[1].add - b[1].add).map(([t, i]) => (i.values ? [t, i.values] : [t]));
   const NO_TURN = { bath: 1, box: 1, curtain: 1, curtainTrack: 1 };
   const r2 = (v) => Math.round(v * 100) / 100;
   const copyP = (p) => JSON.parse(JSON.stringify(p));
@@ -4392,4 +4506,3 @@ boot().catch((err) => {
   console.error(err);
 });
 
-})();

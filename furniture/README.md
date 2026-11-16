@@ -1,7 +1,7 @@
 # furniture
 
 The furniture for every flat page. Pages load `index.js`, and it loads the files listed in it from this folder.
-Keep this folder next to `results\`, because the pages in `results\` load `../furniture/index.js`.
+Keep this folder next to `results\`, because the pages in `results\<folder>\` load `../../furniture/index.js`.
 
 ## Add a piece
 

@@ -1,7 +1,7 @@
 {
  "name": "showroom",
  "file": "showroom",
- "title": { "ka": "შოურუმი", "en": "Showroom: modular sofa", "rooms": "1 room" },
+ "title": { "ka": "შოურუმი", "en": "Showroom: corner sofa", "rooms": "1 room" },
  "start": [2.45, 3.55, 0],
  "rooms": [
   { "id": "living", "ka": "საერთო ოთახი", "en": "Living room", "area": 18.0, "rects": [[0.2, 0.2, 4.7, 4.2]], "label": [2.45, 3.6],
@@ -21,9 +21,9 @@
  "rails": [],
  "switches": [[4.7, 2.7, -90]],
  "furniture": [
-  { "t": "modularSofa", "x": 2.45, "z": 0.63 },
+  { "t": "channelCornerSofa", "x": 2.45, "z": 0.68 },
   { "t": "rug", "mat": "rugTri", "rect": [1.25, 1.2, 3.65, 2.9] },
-  { "t": "coffeeTable", "x": 1.75, "z": 1.95 },
+  { "t": "coffeeTable", "x": 3.1, "z": 1.8 },
   { "t": "floorLamp", "x": 0.55, "z": 0.55 },
   { "t": "plantLeafy", "x": 4.3, "z": 0.6, "seed": 3, "h": 1.4, "n": 16, "leaf": 0.3, "mats": ["leafA", "leafA", "leafD"], "pot": "pot", "potR": 0.17, "potH": 0.34 },
   { "t": "downlight", "x": 1.3, "z": 1.2 },

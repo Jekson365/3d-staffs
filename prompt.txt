@@ -2,23 +2,14 @@
 
 Build an apartment model using the flat template in `"C:\Users\Jeko\Desktop\flat-3d - Copy`.
 
-- Plan image: https://x2.ge/assets/2d_render_images/667e7ffdb2aee.webp
+- Plan image: ""C:\Users\Jeko\Desktop\WhatsApp Image 2026-11-14 at 19.35.19.jpeg""
 
 ## Room areas
-
-საერთო ფართი 95.6 მ2
-
-ჰოლი	11.3 მ2
-საერთო ოთახი	30 მ2
-საძინებელი	22.1 მ2
-საძინებელი	21.7 მ2
-სანკვანძი	5.6 მ2
-აივანი	5.2 მ2
-## Instructions
+ ## Instructions
 
  
 1. Read `"C:\Users\Jeko\Desktop\flat-3d - Copy\CLAUDE.md"` first and follow its Per-flat procedure.
-2. Write the apartment's JSON file only. If a furniture piece is missing, add it as a file in `furniture\` and run `tools\furniture-index.mjs`; touch `src\` only if an opening kind is missing.
+2. Write the apartment's JSON file only. Touch `src\` only if a furniture piece or opening kind is missing.
 3. Start with `tools\trace.mjs`.
 4. If the walls are dark or the background is transparent and the tracer gives fragments, measure the walls from pixel scans as for previous apartments (see State).
 5. Turn the plan so its main windows face south.
@@ -35,7 +26,7 @@ Build an apartment model using the flat template in `"C:\Users\Jeko\Desktop\flat
 - `build.mjs` shows every room within 1% of its specified area.
 - The top-view overlay lines up with the original image.
 - `walktest.mjs` reports `RESULT: PASS` on desktop and touch.
-- The offline file is saved in `"C:\Users\Jeko\Desktop\flat-3d - Copy\results` using a descriptive, unique filename.
+- The offline file is saved in `"C:\Users\Jeko\Desktop\flat-3d - Copy\results` using a descriptive, unique filename. and .html in the same directory as well
 - Publish the page as a new private artifact.
 - Add the apartment to the State section of `CLAUDE.md`, using its descriptive name rather than a flat number.
 

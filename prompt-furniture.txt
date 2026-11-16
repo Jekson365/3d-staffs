@@ -1,0 +1,56 @@
+# Make a New Furniture Piece
+
+Make a new 3D furniture piece for the flat template in `"C:\Users\Jeko\Desktop\flat-3d - Copy"` and save it in its `furniture\` folder.
+
+- What it is: <for example: round oak dining table with one central leg>
+- Label in the Furniture panel: corner sofa
+- Photo or product page: https://gorgia.ge/images/ab__webp/detailed/48/BM-00157269_-_sofa_jpg.webp
+- Size in metres: width <W> x depth <D> x height <H>
+- Colours / materials: <for example: oak top, black metal leg>
+- Also put it into a flat (optional): <flat data name and where, or "no">
+
+## Instructions
+
+1. Read `CLAUDE.md` (Rules, Builder cheat sheet, Gotchas) and `furniture\README.md`. Do not read whole engine files: grep and read only the part you need.
+2. Look at one or two existing pieces of the same kind in `furniture\` (and the shared parts in `furniture\_parts.js`) and reuse their helpers.
+3. Pick a short camelCase id. If `furniture\<id>.js` already exists, choose another id; never overwrite a piece.
+4. Write `furniture\<id>.js`:
+   - `'use strict';`, then a comment with the size and its native direction (the front or the sitter faces south, +Z).
+   - `piece('<id>', { name: '<label>', add: <next free number after the highest add: in the folder>, values: { ... } }, function (p) { pAt(p, () => { ... }); });`
+   - Build it centred on its own origin, standing on the floor (y0 = 0), true to the photo and the size above.
+   - Use materials that already exist in `source\src\20-mats.js`. Let the main colour be a value (`p.mat` with a default) when that makes sense.
+     If no existing material fits, stop and tell me: a new material changes the engine and means rebuilding every flat.
+   - Add a collider (`colRect` / `colCircle`) covering its footprint. Lamps with `pLamp`, mirrors with `pMirror`, things hanging from the ceiling inside `into(CEIL, ...)`.
+   - Keep light stand-ins inside the visible shape; small or thin parts get `occ: false`.
+   - Keep the mesh light: modest `seg` and `cell`; no more detail than shows from 1 m away.
+5. From `source\`, run `node tools/furniture-index.mjs`. It must accept the file.
+6. Add a row for the piece to the furniture table in `source\flats\FORMAT.md` (size, native direction, values).
+7. Test it in the showroom: put it in `source\flats\showroom.json` in place of the current showcase piece (keep 0.8 m walkways),
+   then `node tools/build.mjs showroom`, `node tools/walktest.mjs showroom` and `node tools/walktest.mjs showroom touch`.
+8. Take up to three screenshots of it in the showroom (front three-quarter, side, from above). Compare them with the photo and fix the proportions.
+   Check the output for `[exception]` lines. Delete `source\dist\shots` when done.
+9. If I asked for it in a flat: add it to that flat's `furniture` in `source\flats\<name>.json`, rebuild with the offline path
+   `node tools/build.mjs <name> "../results/<folder>/<file>.html"`, and run both walk tests. Do not republish anything unless I ask.
+10. Add one line about the piece to the State section of `CLAUDE.md`.
+11. in case of sofas make realistic pillows
+
+## Completion criteria
+
+- `furniture-index.mjs` accepts the file and lists it.
+- Both showroom walk tests report `RESULT: PASS`.
+- The screenshots match the photo and the size.
+- No other piece, flat or engine file changed (except `showroom.json`, `FORMAT.md`, `CLAUDE.md` and a flat I named).
+
+## Cost constraints
+
+- At most three screenshots.
+- Use text checks otherwise.
+- Do not ask questions unless blocked.
+
+## Final response
+
+Provide:
+1. Path of the new piece file and its id.
+2. Its size, materials and the values it takes.
+3. What you assumed.
+4. What you did not check.

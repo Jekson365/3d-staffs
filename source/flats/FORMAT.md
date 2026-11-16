@@ -117,6 +117,7 @@ The comment at the top of each piece file in the shared folder `furniture/` (one
 | `sofa` (2.52 x 1.11), `cornerSofa` (chaise at the east end), `armchair` | sitter faces south | |
 | `shellSofa` (1.72 x 0.82, 0.80 high; channel-tufted shell, JYSK-style) | sitter faces south | `mat` fabric (default `terracotta`), `legs` (default `oak`) |
 | `modularSofa` (2.81 x 0.82, 1.43 deep with the ottoman, 0.85 high; gorgia.ge MLM-110293) | sitter faces south | `mat` (default `chenille`), `legs` (default `ebony`), `ottoman` 1 east / -1 west / 0 none, `pillows` 0 no throw pillows |
+| `channelCornerSofa` (2.55 x 0.92, 1.60 deep at the chaise, 0.86 high; gorgia.ge BM-00157269) | sitter faces south, chaise west | `mat` (default `teal`), `chaise` 1 west / -1 east, `pillows` 0 no throw pillows |
 | `art` | framed print on a wall, facing south | `mat` (`art1`..`art3`), `y` centre height, `w`, `h` |
 | `curtain`, `curtainTrack` | along X only | `x0`, `x1`, `z`, `y0`, `y1` |
 | `bed` | double, head to the west | |
