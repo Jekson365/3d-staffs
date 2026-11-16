@@ -178,6 +178,14 @@ Update this section whenever it changes.
 - 2026-11-16: new piece `kajada` ("კაჟადა", add 35; gorgia.ge BM-00170661): painted chest, two panelled doors over a drawer, shaped apron, brass knobs. `showroom.json` now shows it (was `pcChair`); both showroom walk tests pass. No flat rebuilt.
 - 2026-11-16: new piece `hagernas` ("HAGERNAS", add 36; gorgia.ge BM-00217948): pine table 1.20 x 0.75 with four slat-back chairs. `showroom.json` now shows it (was `kajada`; coffee table moved to the south-east corner); both showroom walk tests pass. No flat rebuilt.
 - 2026-11-16: `prompt-flat.html` (beside `prompt-furniture.html`): a form that writes the new-flat prompt (plan image with preview, total, rooms or a pasted list, window side, furnished or empty, publish or not, notes; draft kept in the browser).
+- Two-bedroom flat with two balconies, 122 m² (data `twobed122`, built 2026-11-16 from https://cityzen-develop.s3.eu-central-1.amazonaws.com/1232132c-949c-4fae-9e7d-0133b9d03c22.png
+  (WebP behind a .png link), turned 90° anticlockwise so the living room's slanted glazed facade faces south): offline `results	wobed-two-balconies-122m2	wobed-two-balconies-122m2.html`;
+  published at https://claude.ai/artifact/YDwQz79JTwZxde6kUB93dg (with the furniture folder). Grey walls on light grey, pixel scans, ppm 42.6, origin px (40, 182) in the turned image.
+  Data from `results	wobed-two-balconies-122m2gen.py` (pixels in the ORIGINAL image, 45° lines as x + y = c / y - x = c; knobs as name=value, built with
+  `42.6 livN=192 hallS=617 wcW=548 bedBfac=794 railS_SW=418 railS_NW=796`). 45° slants: living room = convex `poly` + one rect, its two glazed facade walls meet in a point
+  (fixed glass and a glazed door in each), bedroom 14.6 is a `poly` with a slanted outer wall and a thin glazed slant (door) to the small balcony; both balconies are triangular `poly`.
+  The two air shafts by the hall are one `shafts` block. Moved for the areas: living north (now west) wall 0.12 m out, hall/bedroom wall 3 px, small balcony rails about 0.2 m out.
+  Total 122 is the given figure (rooms add to 116.5). Both walk tests pass; overlay lines up.
 - Per-flat output in this copy: one folder `results\<descriptive name>\` holding the offline page, plan image, `info.txt` (URL, measurements, cost), scripts.
   Since 2026-11-16 the pages live inside those folders (moved, `../furniture` rewritten to `../../furniture`; checked: a moved page opened as a file loads all 51 pieces).
   `build.mjs` alone writes the offline page to `..\<file>.html`: pass the folder path, e.g. `node tools/build.mjs threebed80 "../results/threebed-80m2/threebed-balcony-82m2.html"`.

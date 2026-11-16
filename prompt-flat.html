@@ -203,7 +203,7 @@ const rooms = () => [...$('rooms').children].map((r) => ({ name: r.children[0].v
 function parsePaste(text) {
   const got = [];
   text.split(/\r?\n/).forEach((line) => {
-    const m = /^(.*?)[\s:–-]*([0-9]+(?:[.,][0-9]+)?)\s*(?:მ2|მ²|m2|m²|კვ\.?\s*მ)?\s*$/.exec(line.trim());
+    const m = /^(.*?)[\s:–-]*([0-9]+(?:[.,][0-9]+)?)\s*(?:მ2|მ²|m2|m²|კვ\.?\s*მ|მ)?\s*$/.exec(line.trim());
     if (!m || !m[1].trim()) return;
     const area = m[2].replace(',', '.');
     if (/საერთო\s*ფართ/.test(m[1])) $('total').value = area; else got.push([m[1].trim(), area]);
@@ -213,7 +213,9 @@ function parsePaste(text) {
 
 function render() {
   const url = $('url').value.trim(), name = $('name').value.trim(), total = $('total').value.trim();
-  const list = rooms(), turn = $('turn').value, furn = $('furn').value, pub = $('publish').checked, notes = $('notes').value.trim();
+  // rooms still in the paste box count too, so a pasted list works without pressing "Add pasted rooms"
+  const pend = $('paste').hidden ? [] : parsePaste($('paste').value).map(([n, a]) => ({ name: n, area: a }));
+  const list = rooms().concat(pend), turn = $('turn').value, furn = $('furn').value, pub = $('publish').checked, notes = $('notes').value.trim();
   const sum = list.reduce((s, r) => s + (parseFloat(r.area) || 0), 0);
   const hint = $('sumHint');
   hint.className = 'hint';
@@ -280,6 +282,7 @@ async function copyText(text) {
 
 ['url', 'name', 'total', 'notes'].forEach((k) => $(k).addEventListener('input', () => { if (k === 'url') updatePreview(); render(); }));
 ['turn', 'furn', 'publish'].forEach((k) => $(k).addEventListener('change', render));
+$('paste').addEventListener('input', render);
 $('addRoom').addEventListener('click', () => { addRoom().focus(); render(); });
 $('pasteBtn').addEventListener('click', () => {
   const ta = $('paste');

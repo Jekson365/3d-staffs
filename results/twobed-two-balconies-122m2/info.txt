@@ -1,0 +1,40 @@
+Two-bedroom flat with two balconies, 122 m2  (data name twobed122)
+Built 2026-11-16 with the flat-3d template in "flat-3d - Copy".
+
+PLAN IMAGE
+  https://cityzen-develop.s3.eu-central-1.amazonaws.com/1232132c-949c-4fae-9e7d-0133b9d03c22.png
+  (960 x 776 WebP behind a .png link; copy saved here as plan.png)
+  Turned 90 degrees anticlockwise so the living room's slanted glazed facade (drawn on the left) faces south.
+
+PAGES
+  Offline:   C:\Users\Jeko\Desktop\flat-3d - Copy\results\twobed-two-balconies-122m2\twobed-two-balconies-122m2.html
+             (needs the furniture folder at ..\..\furniture)
+  Published: https://claude.ai/artifact/YDwQz79JTwZxde6kUB93dg  (private)
+
+ROOM AREAS (from the request; the plan's labels agree)
+  მისაღები           46.9   built 46.91  (living room with kitchen and dining)
+  საძინებელი         17.4   built 17.29  (-0.6 %)
+  საძინებელი         14.6   built 14.55  (-0.3 %)
+  ჰოლი                7.9   built  7.95  (+0.6 %)
+  სველი წერტილი       6.8   built  6.79  (bathroom with bath)
+  სველი წერტილი       3.9   built  3.89  (shower room)
+  აივანი             11.5   built 11.59  (triangular, off the living room)
+  აივანი              7.5   built  7.48  (off both bedrooms)
+  Rooms add up to 116.5; the given total 122 (shown in the page) includes walls.
+
+MEASUREMENTS
+  Scale 42.6 px per metre (from the room areas). Outer walls about 0.28-0.29 m, partitions 0.10 m, ceiling 2.70.
+  Diagonal walls are all 45 degrees: the living room's two glazed facade walls meet in a point, bedroom 14.6 has
+  a slanted outer wall and a slanted glazed wall with a door to the small balcony, both balconies are triangular.
+  Moved for the areas: living room north (now west) wall inner face 5 px (0.12 m) out, hall/bedroom wall 3 px,
+  shower room wall 1 px, bedroom 14.6 facade 2 px out, small balcony rails about 0.2 m beyond the drawn lines.
+  Rebuild: from source, py ../results/twobed-two-balconies-122m2/gen.py 42.6 livN=192 hallS=617 wcW=548 bedBfac=794 railS_SW=418 railS_NW=796
+  then node tools/build.mjs twobed122 "../results/twobed-two-balconies-122m2/twobed-two-balconies-122m2.html"
+
+FURNITURE
+  As drawn: sofa, two armchairs, coffee and side tables, dining table, kitchen run with fridge, two double beds with
+  night tables, wardrobe, shower room and bathroom fittings, chairs and tables on both balconies, a planter.
+
+COST ESTIMATE WITH THE CLAUDE API
+  About 1.2-1.6 M input tokens (mostly cached) and 60-80 k output tokens on Opus, with 6 images.
+  Roughly 6-12 USD at list prices; less with prompt caching. An estimate, not a measured bill.
