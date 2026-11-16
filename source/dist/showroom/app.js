@@ -1,5 +1,5 @@
 'use strict';
-const FLAT = {"name":"showroom","file":"showroom","title":{"ka":"შოურუმი","en":"Showroom: corner sofa","rooms":"1 room"},"start":[2.45,3.55,0],"rooms":[{"id":"living","ka":"საერთო ოთახი","en":"Living room","area":18,"rects":[[0.2,0.2,4.7,4.2]],"label":[2.45,3.6],"floor":{"mat":"floorLiv","uv":"plank","off":[0.31,0.2]}}],"walls":[[0,0,4.9,0.2],[0,4.2,4.9,4.4],[0,0.2,0.2,4.2],[4.7,0.2,4.9,4.2]],"shafts":[],"openings":[{"id":"entry","kind":"entry","axis":"z","at":[4.7,4.9],"a":2.9,"b":3.85,"handle":"a"},{"id":"winLiv","kind":"window","axis":"x","at":[4.2,4.4],"a":1.45,"b":3.45}],"rails":[],"switches":[[4.7,2.7,-90]],"furniture":[{"t":"channelCornerSofa","x":2.45,"z":0.68},{"t":"rug","mat":"rugTri","rect":[1.25,1.2,3.65,2.9]},{"t":"coffeeTable","x":3.1,"z":1.8},{"t":"floorLamp","x":0.55,"z":0.55},{"t":"plantLeafy","x":4.3,"z":0.6,"seed":3,"h":1.4,"n":16,"leaf":0.3,"mats":["leafA","leafA","leafD"],"pot":"pot","potR":0.17,"potH":0.34},{"t":"downlight","x":1.3,"z":1.2},{"t":"downlight","x":3.6,"z":1.2},{"t":"downlight","x":1.3,"z":3.2},{"t":"downlight","x":3.6,"z":3.2},{"t":"ceilingLamp","x":2.45,"z":2.2,"s":0.22,"I":1.6,"col":"SOFT","ch":2}],"bounds":[0,0,4.9,4.4],"map":{"x0":-0.2,"z0":-0.2,"w":5.3,"d":4.8},"digits":1,"total":18};
+const FLAT = {"name":"showroom","file":"showroom","title":{"ka":"შოურუმი","en":"Showroom: chest","rooms":"1 room"},"start":[2.45,3.55,0],"rooms":[{"id":"living","ka":"საერთო ოთახი","en":"Living room","area":18,"rects":[[0.2,0.2,4.7,4.2]],"label":[2.45,3.6],"floor":{"mat":"floorLiv","uv":"plank","off":[0.31,0.2]}}],"walls":[[0,0,4.9,0.2],[0,4.2,4.9,4.4],[0,0.2,0.2,4.2],[4.7,0.2,4.9,4.2]],"shafts":[],"openings":[{"id":"entry","kind":"entry","axis":"z","at":[4.7,4.9],"a":2.9,"b":3.85,"handle":"a"},{"id":"winLiv","kind":"window","axis":"x","at":[4.2,4.4],"a":1.45,"b":3.45}],"rails":[],"switches":[[4.7,2.7,-90]],"furniture":[{"t":"kajada","x":2.45,"z":0.45},{"t":"rug","mat":"rugTri","rect":[1.25,1.2,3.65,2.9]},{"t":"coffeeTable","x":3.1,"z":1.8},{"t":"floorLamp","x":0.55,"z":0.55},{"t":"plantLeafy","x":4.3,"z":0.6,"seed":3,"h":1.4,"n":16,"leaf":0.3,"mats":["leafA","leafA","leafD"],"pot":"pot","potR":0.17,"potH":0.34},{"t":"downlight","x":1.3,"z":1.2},{"t":"downlight","x":3.6,"z":1.2},{"t":"downlight","x":1.3,"z":3.2},{"t":"downlight","x":3.6,"z":3.2},{"t":"ceilingLamp","x":2.45,"z":2.2,"s":0.22,"I":1.6,"col":"SOFT","ch":2}],"bounds":[0,0,4.9,4.4],"map":{"x0":-0.2,"z0":-0.2,"w":5.3,"d":4.8},"digits":1,"total":18};
 // ---------- 10-util.js : maths, geometry batching, primitive builders ----------
 const T = THREE;
 const PI = Math.PI, TAU = PI * 2, DEG = PI / 180;
@@ -2264,6 +2264,42 @@ piece('jars', { name: 'Jars' }, function (p) {
   pAt(p, () => { for (let i = 0; i < 4; i++) { const z = i * 0.13, m = i % 2 ? 'teal' : 'ceramic', h = 0.12 + (i % 2) * 0.03; CY(m, 0, 0.9, z, 0.048, 0.044, h, { seg: 14 }); CY('oak', 0, 0.9 + h, z, 0.05, 0.05, 0.016, { seg: 14 }); } });
 });
 
+// Painted chest (gorgia.ge BM-00170661): 0.90 wide, 0.45 deep, 0.95 high. Two panelled doors over one drawer,
+// moulded top, plinth with a shaped apron and splayed feet, brass knobs and pulls. native: the front faces south.
+// Values: `mat` the paint (default cabinet), `metal` the handles (default brass).
+piece('kajada', { name: 'კაჟადა', add: 35 }, function (p) {
+  const M = p.mat || 'cabinet', H = p.metal || 'brass';
+  const W = 0.9, D = 0.45, f = D / 2 - 0.02;   // f: carcass front face
+  pAt(p, () => {
+    // feet and shaped apron (two steps stand in for the curve)
+    for (const sx of [-1, 1]) B(M, sx * (W / 2 - 0.05), 0, 0, 0.07, 0.14, D - 0.06, { occ: false });
+    B(M, 0, 0.1, f - 0.01, W - 0.1, 0.04, 0.03, { occ: false });
+    B(M, 0, 0.07, f - 0.01, W - 0.3, 0.03, 0.03, { occ: false });
+    // plinth band, carcass, top
+    RB(M, 0, 0.14, 0, W + 0.02, 0.035, D - 0.01, 0.008, { cell: 0.2 });
+    B(M, 0, 0.175, -0.01, W - 0.02, 0.73, D - 0.06);
+    RB(M, 0, 0.9, 0, W + 0.04, 0.04, D + 0.01, 0.012, { cell: 0.2 });
+    RB(M, 0, 0.88, 0, W, 0.02, D - 0.03, 0.006, { occ: false });
+    // drawer with an inset line and two knobs
+    B(M, 0, 0.18, f, W - 0.04, 0.17, 0.02, { occ: false });
+    B(M, 0, 0.21, f + 0.011, W - 0.1, 0.11, 0.004, { occ: false });
+    RB(M, 0, 0.35, 0.005, W + 0.01, 0.022, D - 0.02, 0.006, { occ: false });
+    for (const sx of [-1, 1]) SP(H, sx * 0.3, 0.265, f + 0.025, 0.017, { occ: false });
+    // two doors, each with two raised panels, and bar pulls in the middle
+    for (const sx of [-1, 1]) {
+      const cx = sx * (W / 4 - 0.005);
+      B(M, cx, 0.38, f, W / 2 - 0.03, 0.49, 0.02, { occ: false });
+      for (const px of [-0.1, 0.1]) {
+        RB(M, cx + px, 0.43, f + 0.012, 0.17, 0.39, 0.012, 0.012, { occ: false });
+        B(M, cx + px, 0.45, f + 0.019, 0.13, 0.35, 0.002, { occ: false });
+      }
+      CY(H, sx * 0.03, 0.68, f + 0.03, 0.006, 0.006, 0.07, { seg: 8, occ: false });
+      SP(H, sx * 0.03, 0.75, f + 0.03, 0.01, { occ: false });
+    }
+    colRect(-W / 2 - 0.02, -D / 2, W / 2 + 0.02, D / 2);
+  });
+});
+
 // oak wall shelf of length w (0.8) with storage jars, bowls and a small plant. native: on a north wall, facing south
 piece('kitchenShelf', { name: 'Kitchen shelf' }, function (p) {
   const w = p.w || 0.8, a = -0.375 * w, b = -0.2 * w, c = 0.1 * w, d = 0.375 * w;
@@ -2370,6 +2406,43 @@ piece('nightTable', { name: 'Bedside table', add: 16 }, function (p) {
     SP('lampOn', 0, 0.68, 0, 0.085, { seg: 16, hseg: 12 });
     colCircle(0, 0, 0.19);
     pLamp(0.03, 0.72, 0, 0.42, WARM, 1, { glow: 0.75 });
+  });
+});
+
+// Office swivel chair (gorgia.ge BM-00195991): 0.66 across the five-star base, 0.62 wide at the arms, 1.20 high, seat 0.48.
+// Beige faux-leather high back and seat, beige plastic star base on casters, black gas lift. native: the sitter faces south.
+// Values: `mat` the upholstery (default beige), `frame` the base and arms (default beige).
+piece('pcChair', { name: 'pc chair', add: 34 }, function (p) {
+  const U = p.mat || 'beige', Fr = p.frame || 'beige';
+  pAt(p, () => {
+    // five-star base with casters
+    for (let k = 0; k < 5; k++) {
+      const a = k * 2 * PI / 5 + PI / 2, x = Math.cos(a) * 0.3, z = Math.sin(a) * 0.3;
+      BAR(Fr, [0, 0.1, 0], [x, 0.075, z], 0.022, { occ: false });
+      B(Fr, x, 0.055, z, 0.04, 0.03, 0.04, { occ: false });
+      CY(Fr, x, 0.0, z, 0.03, 0.03, 0.025, { rx: PI / 2, seg: 10, occ: false });
+      SP(Fr, x, 0.03, z, 0.03, { occ: false });
+    }
+    CY(Fr, 0, 0.07, 0, 0.05, 0.06, 0.06, { seg: 12, occ: false });
+    CY('blackMetal', 0, 0.12, 0, 0.025, 0.025, 0.24, { seg: 10, occ: false });
+    CY(Fr, 0, 0.12, 0, 0.035, 0.035, 0.12, { seg: 10, occ: false });
+    B('plastic', 0, 0.36, 0.02, 0.24, 0.05, 0.26, { occ: false });
+    BAR('blackMetal', [0.1, 0.37, 0.05], [0.24, 0.35, 0.1], 0.008, { occ: false });
+    // seat: padded cushion with a waterfall front
+    RB(U, 0, 0.4, 0.03, 0.5, 0.09, 0.48, 0.04, { cell: 0.15 });
+    PIL(U, 0, 0.485, 0.03, 0.48, 0.05, 0.44, { flange: 0.008, lump: 0.01, seed: 5 });
+    // high back, leaning back a little, with a sewn head panel
+    place(0, 0, -0.2, 0, () => {
+      RB(U, 0, 0.5, 0, 0.48, 0.7, 0.09, 0.04, { rx: -0.14, cell: 0.15, occ: false });
+      RB(U, 0, 0.98, -0.07, 0.465, 0.21, 0.1, 0.035, { rx: -0.14, cell: 0.15, occ: false });
+    });
+    // arms: post from the seat, padded rest
+    for (const sx of [-1, 1]) {
+      B(Fr, sx * 0.285, 0.38, 0.12, 0.045, 0.27, 0.06, { occ: false });
+      B(Fr, sx * 0.285, 0.38, -0.06, 0.045, 0.04, 0.3, { occ: false });
+      RB(U, sx * 0.285, 0.65, 0.04, 0.07, 0.045, 0.3, 0.02, { occ: false });
+    }
+    colCircle(0, 0, 0.33);
   });
 });
 

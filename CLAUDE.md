@@ -174,6 +174,8 @@ Update this section whenever it changes.
   same bake stats, and the offline page works opened as a file. Every `results\` flat was rebuilt into its same file name and walk-tested.
   Not rebuilt: flat1..10b, showroom, flat11, twobed-curved (their old pages still carry their own copy and still work). No artifact republished.
 - 2026-11-16: new piece `channelCornerSofa` ("Corner sofa (channel)", add 33; gorgia.ge BM-00157269): teal L sofa, channel-tufted seat and back, rolled arms, chaise west (`chaise: -1` east), chrome legs. `showroom.json` now shows it (was `modularSofa`; coffee table moved); both showroom walk tests pass. No flat rebuilt.
+- 2026-11-16: new piece `pcChair` ("pc chair", add 34; gorgia.ge BM-00195991): beige high-back office swivel chair, padded arms, five-star base on casters. `showroom.json` now shows it (was `channelCornerSofa`); both showroom walk tests pass. No flat rebuilt.
+- 2026-11-16: new piece `kajada` ("კაჟადა", add 35; gorgia.ge BM-00170661): painted chest, two panelled doors over a drawer, shaped apron, brass knobs. `showroom.json` now shows it (was `pcChair`); both showroom walk tests pass. No flat rebuilt.
 - Per-flat output in this copy: one folder `results\<descriptive name>\` holding the offline page, plan image, `info.txt` (URL, measurements, cost), scripts.
   Since 2026-11-16 the pages live inside those folders (moved, `../furniture` rewritten to `../../furniture`; checked: a moved page opened as a file loads all 51 pieces).
   `build.mjs` alone writes the offline page to `..\<file>.html`: pass the folder path, e.g. `node tools/build.mjs threebed80 "../results/threebed-80m2/threebed-balcony-82m2.html"`.
